@@ -184,7 +184,10 @@ def _urlsafe_encode(value: bytes) -> str:
 
 def _urlsafe_decode(value: str) -> bytes:
     padding = "=" * (-len(value) % 4)
-    return base64.b64decode(value + padding, altchars=b"-_", validate=True)
+    decoded = base64.b64decode(value + padding, altchars=b"-_", validate=True)
+    if _urlsafe_encode(decoded) != value:
+        raise ValueError("Non-canonical URL-safe base64 encoding.")
+    return decoded
 
 
 def create_session_token(
@@ -198,6 +201,10 @@ def create_session_token(
 
     if not username or not secret:
         raise ValueError("A username and session secret are required.")
+    if len(secret) < MINIMUM_SESSION_SECRET_BYTES:
+        raise ValueError(
+            f"Session secrets must contain at least {MINIMUM_SESSION_SECRET_BYTES} bytes."
+        )
     if lifetime_seconds <= 0:
         raise ValueError("Session lifetime must be positive.")
     issued_at = int(time.time()) if now is None else int(now)
@@ -227,7 +234,11 @@ def verify_session_token(
 ) -> str | None:
     """Return the authenticated username for a valid, unexpired session token."""
 
-    if not token or len(token) > 2048 or not secret:
+    if (
+        not token
+        or len(token) > 2048
+        or len(secret) < MINIMUM_SESSION_SECRET_BYTES
+    ):
         return None
     try:
         payload, separator, raw_signature = token.partition(".")
@@ -240,7 +251,13 @@ def verify_session_token(
         if not hmac.compare_digest(signature, expected):
             return None
         claims = json.loads(_urlsafe_decode(payload))
-    except (UnicodeEncodeError, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
+    except (
+        UnicodeEncodeError,
+        UnicodeDecodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+    ):
         return None
     if not isinstance(claims, dict) or claims.get("v") != 1:
         return None
