@@ -723,7 +723,11 @@ class AIGovernanceControlPlane:
         self.audit_log.append(
             "governance.prompt_inspected",
             event.event_id,
-            event.as_dict(),
+            {
+                key: value
+                for key, value in event.as_dict().items()
+                if key != "safe_preview"
+            },
         )
 
         incident: GovernanceIncident | None = None

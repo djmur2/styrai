@@ -532,7 +532,7 @@ class DatasetGovernanceEngine:
     def _require_synthetic(payload: dict[str, Any], field: str) -> None:
         if _coerce_bool(payload.get(field)) is not True:
             raise ValueError(
-                "This local prototype accepts synthetic demonstration material only; "
+                "This demonstration environment accepts synthetic material only; "
                 f"set {field}=true to confirm."
             )
 

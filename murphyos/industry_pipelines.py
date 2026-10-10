@@ -103,6 +103,8 @@ class PipelineRun:
     status: str
     current_stage: str | None
     stages: list[PipelineStage]
+    operated_by: str | None = None
+    approval_contexts: list[dict[str, Any]] = field(default_factory=list)
     provider_invoked: bool = False
     downstream_invoked: bool = False
     runtime_event: dict[str, Any] | None = None
@@ -138,6 +140,8 @@ class PipelineRun:
                 "status": self.status,
                 "current_stage": self.current_stage,
                 "stages": [stage.as_dict() for stage in self.stages],
+                "operated_by": self.operated_by,
+                "approval_contexts": self.approval_contexts,
                 "provider_invoked": self.provider_invoked,
                 "downstream_invoked": self.downstream_invoked,
                 "runtime_event": self.runtime_event,
@@ -456,7 +460,7 @@ STAGES = (
     StageDefinition(
         "model",
         "Run approved model",
-        "Invoke a deterministic local model adapter through the approved route.",
+        "Invoke a deterministic model adapter through the approved route.",
         ("MODEL-USE-02", "MON-01"),
     ),
     StageDefinition(
@@ -479,7 +483,7 @@ STAGES = (
     ),
     StageDefinition(
         "execute",
-        "Execute local adapter",
+        "Execute simulated adapter",
         "Verify the bound receipt and invoke the idempotent demonstration adapter.",
         ("HUMAN-01", "EVID-01"),
     ),
@@ -499,7 +503,7 @@ PIPELINES = (
         title="Material payment release",
         description=(
             "Assess a fictional payment batch, validate the recommendation, obtain "
-            "two independent approvals and release it through a local adapter."
+            "two independent approvals and release it through a simulated adapter."
         ),
         source_system="Treasury Operations Hub",
         asset_id="agent-payment-ops",
@@ -651,7 +655,12 @@ class PipelineService:
         allowed_modes = {item["id"] for item in definition.modes}
         if mode not in allowed_modes:
             raise PipelineWorkflowError("Unknown pipeline mode.")
-        actor = str(payload.get("actor") or definition.actor_id).strip()
+        operated_by = str(payload.get("operated_by", "")).strip() or None
+        actor = str(
+            definition.actor_id
+            if operated_by is not None
+            else payload.get("actor") or definition.actor_id
+        ).strip()
         if not actor:
             raise PipelineWorkflowError("An initiating actor is required.")
         with self._lock:
@@ -682,6 +691,7 @@ class PipelineService:
                 status="created",
                 current_stage="source",
                 stages=steps,
+                operated_by=operated_by,
                 passport=self._passport_view(definition),
             )
             self.runs[run.run_id] = run
@@ -695,6 +705,7 @@ class PipelineService:
                     "case_id": run.case_id,
                     "mode": run.mode,
                     "actor": run.actor,
+                    "operated_by": run.operated_by,
                     "source_snapshot_sha256": _canonical_hash(source),
                     "source_classification": source["classification"],
                     "synthetic_data": True,
@@ -745,17 +756,26 @@ class PipelineService:
         approver_id: str,
         approved: bool,
         rationale: str,
+        demonstration_approver_id: str | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             run = self._run(run_id)
             if run.status != "waiting_approval" or not run.governed_action:
                 raise PipelineWorkflowError("The pipeline is not waiting for approval.")
-            identity = DEMO_IDENTITIES.get(approver_id)
+            demo_approver_id = demonstration_approver_id or approver_id
+            identity = DEMO_IDENTITIES.get(demo_approver_id)
             definition = self._definition(run.pipeline_id)
             if identity is None or identity["role"] not in definition.required_approver_roles:
                 raise PipelineWorkflowError("This demonstration identity is not an approved reviewer for the pipeline.")
-            if approver_id == run.actor:
+            if demo_approver_id == run.actor:
                 raise PipelineWorkflowError("The pipeline initiator cannot approve the action.")
+            if any(
+                item["demonstration_approver_id"] == demo_approver_id
+                for item in run.approval_contexts
+            ):
+                raise PipelineWorkflowError(
+                    "Each demonstration reviewer role can be used only once."
+                )
             action_id = run.governed_action["action"]["action_id"]
             governed = self.service.decide_approval(
                 action_id=action_id,
@@ -764,6 +784,18 @@ class PipelineService:
                 rationale=rationale,
             )
             run.governed_action = governed.as_dict()
+            approval_context = {
+                "approver_id": approver_id,
+                "demonstration_approver_id": demo_approver_id,
+                "demonstration_role": identity["role"],
+                "approved": approved,
+            }
+            run.approval_contexts.append(approval_context)
+            self.service.audit_log.append(
+                "pipeline.approval_attributed",
+                run.run_id,
+                approval_context,
+            )
             step = self._step(run, "approval")
             step.timestamp = now_iso()
             if not approved:
@@ -921,7 +953,9 @@ class PipelineService:
             self._execution_cache[idempotency_key] = deepcopy(run.execution)
             execute_step = self._step(run, "execute")
             execute_step.status = "complete"
-            execute_step.detail = "The local adapter executed the exact receipt-bound action once."
+            execute_step.detail = (
+                "The demonstration adapter executed the exact receipt-bound action once."
+            )
             execute_step.timestamp = executed_at
             self.service.audit_log.append(
                 "pipeline.tool_executed",

@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  StyrAI staging foundation: a private ECR repository, a single-node Lightsail
+  container service, and a branch-scoped GitHub Actions OIDC deployment role.
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Default: djmur2
+    AllowedPattern: "[A-Za-z0-9_.-]+"
+  GitHubRepository:
+    Type: String
+    Default: styrai
+    AllowedPattern: "[A-Za-z0-9_.-]+"
+  DeploymentBranch:
+    Type: String
+    Default: main
+    AllowedPattern: "[A-Za-z0-9_./-]+"
+Resources:
+  GitHubActionsOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      Tags:
+        - Key: Project
+          Value: StyrAI
+        - Key: Environment
+          Value: staging
+
+  StyrAIStagingContainer:
+    Type: AWS::Lightsail::Container
+    Properties:
+      ServiceName: styrai-staging
+      Power: nano
+      Scale: 1
+      IsDisabled: false
+      PrivateRegistryAccess:
+        EcrImagePullerRole:
+          IsActive: true
+      Tags:
+        - Key: Project
+          Value: StyrAI
+        - Key: Environment
+          Value: staging
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  StyrAIStagingRepository:
+    Type: AWS::ECR::Repository
+    DependsOn: StyrAIStagingContainer
+    Properties:
+      RepositoryName: styrai-staging
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      EmptyOnDelete: false
+      LifecyclePolicy:
+        LifecyclePolicyText: >-
+          {"rules":[{"rulePriority":1,"description":"Retain the 20 most recent staging images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowStyrAILightsailPull
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt StyrAIStagingContainer.PrivateRegistryAccess.EcrImagePullerRole.PrincipalArn
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+      Tags:
+        - Key: Project
+          Value: StyrAI
+        - Key: Environment
+          Value: staging
+
+  GitHubStagingDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: styrai-github-staging-deploy
+      Description: Branch-scoped deployment role for the StyrAI staging service.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubActionsOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOwner}/${GitHubRepository}:ref:refs/heads/${DeploymentBranch}
+      Policies:
+        - PolicyName: PushOnlyToStyrAIStagingRepository
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ObtainEcrAuthorizationToken
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: PushStyrAIStagingImages
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecr:BatchGetImage
+                Resource: !GetAtt StyrAIStagingRepository.Arn
+        - PolicyName: DeployOnlyToStyrAILightsail
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DeployAndVerifyStaging
+                Effect: Allow
+                Action:
+                  - lightsail:CreateContainerServiceDeployment
+                  - lightsail:GetContainerServices
+                  - lightsail:GetContainerServiceDeployments
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref AWS::Region
+      Tags:
+        - Key: Project
+          Value: StyrAI
+        - Key: Environment
+          Value: staging
+
+Outputs:
+  AwsAccountId:
+    Description: AWS account used by the staging deployment workflow.
+    Value: !Ref AWS::AccountId
+  AwsRegion:
+    Description: AWS Region used by the staging deployment workflow.
+    Value: !Ref AWS::Region
+  ContainerServiceName:
+    Value: !Ref StyrAIStagingContainer
+  ContainerServiceUrl:
+    Description: Default HTTPS URL; it becomes live after the first deployment.
+    Value: !GetAtt StyrAIStagingContainer.Url
+  EcrRepositoryName:
+    Value: !Ref StyrAIStagingRepository
+  EcrRepositoryUri:
+    Value: !GetAtt StyrAIStagingRepository.RepositoryUri
+  GitHubDeployRoleArn:
+    Value: !GetAtt GitHubStagingDeployRole.Arn
+  LightsailImagePullerRoleArn:
+    Value: !GetAtt StyrAIStagingContainer.PrivateRegistryAccess.EcrImagePullerRole.PrincipalArn
