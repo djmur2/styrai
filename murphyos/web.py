@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import json
 import threading
 import time
 import webbrowser
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from email import policy as email_policy
 from email.parser import BytesParser
 from http import HTTPStatus
@@ -18,6 +20,7 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 
 from .ai_governance import AIGovernanceControlPlane
+from .auth import load_auth_users, verify_password
 from .audit import AuditIntegrityError, HashChainedAuditLog
 from .dataset_governance import DatasetGovernanceEngine
 from .demo import demo_policy, demo_registry
@@ -46,24 +49,26 @@ class DemoApplication:
         self.platform: GovernancePlatform
         self.execution: ExecutionDemo
         self.pipelines: PipelineService
-        self.reset()
+        self._initialize()
+
+    def _initialize(self) -> dict[str, Any]:
+        self.service = GovernanceService(
+            PolicyEngine(demo_policy()),
+            HashChainedAuditLog(self.audit_path),
+            registry=demo_registry(),
+        )
+        self._seed()
+        self.platform = GovernancePlatform(self.service.audit_log)
+        self.ai_governance = AIGovernanceControlPlane(self.service.audit_log)
+        self.dataset_governance = DatasetGovernanceEngine(self.service.audit_log)
+        self.execution = ExecutionDemo(self.service, self.platform)
+        self.pipelines = PipelineService(self.service, self.platform)
+        return self.state()
 
     def reset(self) -> dict[str, Any]:
         with self.lock:
-            if self.audit_path.exists():
-                self.audit_path.unlink()
-            self.service = GovernanceService(
-                PolicyEngine(demo_policy()),
-                HashChainedAuditLog(self.audit_path),
-                registry=demo_registry(),
-            )
-            self._seed()
-            self.platform = GovernancePlatform(self.service.audit_log)
-            self.ai_governance = AIGovernanceControlPlane(self.service.audit_log)
-            self.dataset_governance = DatasetGovernanceEngine(self.service.audit_log)
-            self.execution = ExecutionDemo(self.service, self.platform)
-            self.pipelines = PipelineService(self.service, self.platform)
-            return self.state()
+            self.service.audit_log.rotate()
+            return self._initialize()
 
     def _seed(self) -> None:
         for scenario in (
@@ -289,12 +294,21 @@ class DemoApplication:
     def decide_pipeline(
         self, run_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
+        demonstration_approver_id = str(
+            payload.get("demonstration_approver_id")
+            or payload.get("demo_approver_id")
+            or ""
+        ).strip()
+        approver_id = str(
+            payload.get("approver_id") or demonstration_approver_id
+        ).strip()
         with self.lock:
             return self.pipelines.decide(
                 run_id,
-                approver_id=str(payload.get("approver_id", "")).strip(),
+                approver_id=approver_id,
                 approved=bool(payload.get("approved", True)),
                 rationale=str(payload.get("rationale", "")).strip(),
+                demonstration_approver_id=demonstration_approver_id or None,
             )
 
     def execute_pipeline(self, run_id: str) -> dict[str, Any]:
@@ -392,19 +406,125 @@ class DemoApplication:
 
 class StyrAIRequestHandler(BaseHTTPRequestHandler):
     application: DemoApplication
+    auth_users: Mapping[str, str] = {}
+    authenticated_username: str | None = None
     web_root = Path(__file__).resolve().parent.parent / "web"
+
+    SECURITY_HEADERS = {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": (
+            "default-src 'self'; base-uri 'none'; object-src 'none'; "
+            "frame-ancestors 'none'; form-action 'self'; script-src 'self'; "
+            "style-src 'self'; img-src 'self' data:; connect-src 'self'"
+        ),
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "same-origin",
+        "Permissions-Policy": (
+            "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+        ),
+        "Referrer-Policy": "no-referrer",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+    }
 
     def log_message(self, format: str, *args: object) -> None:
         return
 
-    def _send_json(self, payload: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
+    def end_headers(self) -> None:
+        for name, value in self.SECURITY_HEADERS.items():
+            self.send_header(name, value)
+        super().end_headers()
+
+    def _send_json(
+        self,
+        payload: Any,
+        status: HTTPStatus = HTTPStatus.OK,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> None:
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Cache-Control", "no-store")
+        for name, value in (extra_headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(encoded)
+
+    def _authenticate(self) -> bool:
+        self.authenticated_username = None
+        if not self.auth_users:
+            return True
+
+        authorization = getattr(self, "headers", {}).get("Authorization", "")
+        scheme, separator, encoded_credentials = authorization.partition(" ")
+        username = ""
+        password = ""
+        if separator and scheme.lower() == "basic":
+            try:
+                decoded = base64.b64decode(
+                    encoded_credentials.strip(), validate=True
+                ).decode("utf-8")
+                username, credential_separator, password = decoded.partition(":")
+                if not credential_separator:
+                    username = ""
+            except (binascii.Error, UnicodeDecodeError, ValueError):
+                username = ""
+
+        stored_hash = self.auth_users.get(username)
+        comparison_hash = stored_hash or next(iter(self.auth_users.values()))
+        authenticated = verify_password(password, comparison_hash)
+        if stored_hash is not None and authenticated:
+            self.authenticated_username = username
+            return True
+
+        self._send_json(
+            {"error": "Authentication is required."},
+            HTTPStatus.UNAUTHORIZED,
+            {"WWW-Authenticate": 'Basic realm="StyrAI staging", charset="UTF-8"'},
+        )
+        return False
+
+    def _require_styrai_request_header(self) -> bool:
+        if not self.auth_users:
+            return True
+        if getattr(self, "headers", {}).get("X-StyrAI-Request") == "1":
+            return True
+        self._send_json(
+            {"error": "Authenticated changes require the StyrAI request header."},
+            HTTPStatus.FORBIDDEN,
+        )
+        return False
+
+    def _bind_authenticated_identity(
+        self, path: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        username = self.authenticated_username
+        if username is None:
+            return payload
+        bound = dict(payload)
+        if path in {
+            "/api/governance/inspect",
+            "/api/simulate/call",
+        }:
+            bound["actor"] = username
+        if path == "/api/pipeline-runs":
+            bound.pop("actor", None)
+            bound["operated_by"] = username
+        if path.startswith("/api/actions/") and path.endswith("/approval"):
+            bound["approver_id"] = username
+        if path.startswith("/api/executions/") and path.endswith("/decision"):
+            bound["approver_id"] = username
+        if path.startswith("/api/pipeline-runs/") and path.endswith("/decision"):
+            bound["demonstration_approver_id"] = bound.get(
+                "demo_approver_id", bound.get("approver_id")
+            )
+            bound["approver_id"] = username
+        if path.startswith("/api/governance/policies/") and path.endswith(
+            "/activate"
+        ):
+            bound["approved_by"] = username
+        return bound
 
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
@@ -476,12 +596,13 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path != "/api/health" and not self._authenticate():
+            return
         try:
             if path == "/":
                 self._send_static("index.html", "text/html; charset=utf-8")
@@ -576,8 +697,10 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if not self._authenticate() or not self._require_styrai_request_header():
+            return
         try:
-            payload = self._read_json()
+            payload = self._bind_authenticated_identity(path, self._read_json())
             if path == "/api/actions":
                 self._send_json(
                     self.application.propose(payload), HTTPStatus.CREATED
@@ -757,11 +880,12 @@ def serve(
     *,
     open_browser: bool = False,
 ) -> None:
+    auth_users = load_auth_users()
     application = DemoApplication(audit_path)
     handler = type(
         "ConfiguredStyrAIHandler",
         (StyrAIRequestHandler,),
-        {"application": application},
+        {"application": application, "auth_users": auth_users},
     )
     server = ThreadingHTTPServer((host, port), handler)
     health_url, presentation_url = _browser_urls(host, port)

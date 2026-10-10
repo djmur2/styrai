@@ -257,7 +257,7 @@ class ExecutionDemo:
                 self._step("source", "Task requested", "Client 360 supplied the case context to the copilot.", "complete", "source"),
                 self._step("intercept", "Input intercepted", f"StyrAI classified the call as confidential and detected {len(event['detected_data_types'])} sensitive pattern types.", "complete", "overlay", "DATA-OUT-01"),
                 self._step("redact", "Provider payload minimised", f"{event['redaction_count']} sensitive values were removed before the approved zero-retention route.", "complete", "overlay", "DATA-OUT-01"),
-                self._step("model", "Model executed", "The deterministic local model fixture produced a customer-safe draft through the approved passport.", "complete", "model", "MODEL-USE-02"),
+                self._step("model", "Model executed", "The deterministic model fixture produced a customer-safe draft through the approved passport.", "complete", "model", "MODEL-USE-02"),
                 self._step("action", "External email proposed", "The copilot requested the email tool; the action is bound to the exact model and policy version.", "complete", "tool", "MODEL-USE-02"),
                 self._step("approval", "Human approval required", "External communication is paused for an independent reviewer and rationale.", "waiting", "overlay", "HUMAN-01"),
                 self._step("execute", "Tool execution locked", "No email can be delivered until StyrAI issues an authorisation receipt.", "locked", "tool", "HUMAN-01"),

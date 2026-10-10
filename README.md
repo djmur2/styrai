@@ -4,7 +4,7 @@
 and Windows launch instructions, Linux commands, the three-minute demo and
 troubleshooting.**
 
-StyrAI is a working local prototype of an enterprise AI-governance control
+StyrAI is a working prototype of an enterprise AI-governance control
 plane. It demonstrates two controls that organisations need once AI is in real
 use:
 
@@ -49,6 +49,36 @@ Terminal window. With no other local process running, it will normally be
 
 The internal Python package retains the original `murphyos` development name.
 The product, interface, evidence schemas and documentation use **StyrAI**.
+
+### Optional authentication for hosted synthetic staging
+
+Local launch remains unchanged and does not require a login. For a shared
+staging deployment, set `STYRAI_AUTH_USERS_JSON` to a JSON object mapping each
+founder's distinct username to a salted PBKDF2-SHA256 password hash. Generate a
+hash interactively with the standard-library helper:
+
+```bash
+python3 -m murphyos.auth
+```
+
+The helper reads the password without echo and prints only the encoded hash.
+Store the resulting JSON value in the hosting platform's secret store; never
+commit it or plaintext passwords to this repository. When the variable is set,
+`GET /api/health` remains public for health checks and every other route requires
+HTTP Basic authentication. Expose that mode only behind HTTPS. Browser mutation
+requests also carry a StyrAI-specific request marker, and identity-bearing actor
+and approval fields are attributed to the authenticated username.
+
+Restarting the application continues the existing audit chain. An explicit demo
+reset rotates a non-empty audit file beside the current file before creating a
+fresh chain, so the hosting filesystem or mounted volume must itself be durable
+for those records to survive container replacement.
+
+The shared staging architecture, collaborator access model, automatic-deploy
+workflow, cost boundary and operating runbook are in
+[`docs/HOSTED_STAGING.md`](docs/HOSTED_STAGING.md). A collaborator who only
+uses the demonstration needs the HTTPS link and a StyrAI login; GitHub access is
+needed only to contribute or review source-code changes.
 
 ## The primary demonstration: upload-driven governance
 
@@ -102,7 +132,7 @@ requirement in another.
 
 ### Written-policy interpretation and the role of an LLM
 
-The current local prototype deliberately makes no external model call. It uses
+The current prototype deliberately makes no external model call. It uses
 deterministic pattern matching to convert supported written clauses into a
 machine-readable **draft**. After the operator selects **Run governance
 assessment**, a confirmation dialog shows the extracted rules; approving that
@@ -185,7 +215,7 @@ baseline.
 
 ## What is functional and what is simulated
 
-| Functional in this local prototype | Simulated for demonstration | Required for a production pilot |
+| Functional in this prototype | Simulated for demonstration | Required for a production pilot |
 | --- | --- | --- |
 | CSV/JSON parsing, schema preview and row-level rule evaluation | Synthetic finance and healthcare records | Customer-approved schemas and governed data connectors |
 | Written-policy draft extraction and explicit user activation | Included fictional company policy | Policy-owner workflow, versioning and approval records |
@@ -199,9 +229,9 @@ baseline.
 | Hash-chained evidence records | Regulatory applicability examples | Legal/compliance validation by jurisdiction |
 
 All names, prompts, customers, patients, employees, models and events used in
-the demo are fictional. No customer, patient or bank data is required, uploaded
-or transmitted. The application runs locally and does not contact a model
-provider.
+the demo are fictional. Use synthetic data only in both local and shared staging
+environments. The application does not contact a model provider, bank, EHR or
+enterprise system.
 
 StyrAI demonstrates operational controls and evidence. It does not provide
 legal advice, determine regulatory applicability or certify compliance.
@@ -276,8 +306,9 @@ coverage for the secondary governed-action workflows.
 
 ## What remains before production
 
-The prototype uses seeded in-memory state and a local audit file. A production
-pilot still requires tenant isolation, authentication and authorisation,
-durable append-only storage, signed receipts, customer-approved policies, a real
-AI gateway or telemetry connector, safe customer-side sensitive-data handling,
-security and privacy review, legal validation and tested operational resilience.
+The prototype uses seeded in-memory state and a hash-chained audit file. A
+production pilot still requires tenant isolation, enterprise authentication and
+role-based authorisation, durable append-only storage, signed receipts,
+customer-approved policies, a real AI gateway or telemetry connector, safe
+customer-side sensitive-data handling, security and privacy review, legal
+validation and tested operational resilience.

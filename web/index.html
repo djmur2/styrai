@@ -81,9 +81,9 @@
             </p>
           </div>
           <div class="top-actions">
-            <div class="last-updated"><span class="live-dot"></span><span>Interactive local simulation<br /><small id="updated-at">Updating…</small></span></div>
+            <div class="last-updated"><span class="live-dot"></span><span>Shared synthetic demonstration<br /><small id="updated-at">Updating…</small></span></div>
             <button class="button secondary" id="generate-evidence">Generate evidence pack</button>
-            <button class="button reset-demo-button" id="reset-platform" aria-label="Reset demonstration"><span aria-hidden="true">↺</span> Reset demo</button>
+            <button class="button reset-demo-button" id="reset-platform" aria-label="Reset shared synthetic demonstration"><span aria-hidden="true">↺</span> Reset shared demo</button>
           </div>
         </header>
 
@@ -95,9 +95,9 @@
               <p>Upload a synthetic dataset, inspect exactly what will be evaluated, add a written company policy and run a traceable assessment. StyrAI keeps regulatory results separate from stricter internal requirements.</p>
             </div>
             <aside class="control-room-boundary" aria-label="Demonstration boundary">
-              <span>FUNCTIONAL LOCALLY</span>
+              <span>FUNCTIONAL DEMONSTRATION</span>
               <strong>Policy decisions, enforcement, monitoring, incidents and evidence</strong>
-              <small>Model providers, identities and enterprise connectors are simulated. No real customer data leaves this computer.</small>
+              <small>Model providers, identities and enterprise connectors are simulated. Use synthetic demonstration data only.</small>
             </aside>
           </section>
 
@@ -108,7 +108,7 @@
                 <h3 id="assessment-workbench-title">Evaluate your own synthetic evidence</h3>
                 <p>Nothing is scored until you provide a dataset. Every result shows the records tested, the exact rule applied and the denominator behind each count.</p>
               </div>
-              <span class="assessment-local-badge"><i></i> Local synthetic-data evaluation</span>
+              <span class="assessment-local-badge"><i></i> Synthetic-data evaluation</span>
             </header>
 
             <div class="assessment-input-grid">
@@ -118,11 +118,11 @@
                   <label class="upload-dropzone" id="dataset-dropzone" for="governance-dataset-file">
                     <span class="upload-symbol" aria-hidden="true">⇧</span>
                     <strong>Upload synthetic CSV or JSON</strong>
-                    <small>Drop a file here or choose one from this computer · maximum 512,000 characters / 500 rows</small>
+                    <small>Drop a file here or choose one from your device · maximum 512,000 characters / 500 rows</small>
                     <input id="governance-dataset-file" type="file" accept=".csv,.json,text/csv,application/json" />
                   </label>
                   <div class="sample-data-actions" role="group" aria-label="Load a sample synthetic dataset">
-                    <span>Or load an executable local sample:</span>
+                    <span>Or load a bundled executable sample:</span>
                     <button class="text-button" type="button" data-sample-dataset="credit-decisions">Credit decisions</button>
                     <button class="text-button" type="button" data-sample-dataset="clinical-summaries">Clinical summaries</button>
                   </div>
@@ -162,7 +162,7 @@
 
             <section class="regulation-library-panel" aria-labelledby="regulation-library-title-main">
               <div class="regulation-library-heading"><div><p class="eyebrow">REGULATION LIBRARY</p><h4 id="regulation-library-title-main">The provisions StyrAI can cite</h4><p>Every reference includes its source version, applicability date and the operational controls it informs.</p></div><span id="regulation-library-count">Loading references…</span></div>
-              <div class="regulation-library-grid" id="regulation-library-grid"><div class="regulation-library-loading">Loading exact provisions from the local governance library…</div></div>
+              <div class="regulation-library-grid" id="regulation-library-grid"><div class="regulation-library-loading">Loading exact provisions from the demonstration governance library…</div></div>
             </section>
 
             <section class="dataset-inspection" id="dataset-inspection" aria-labelledby="dataset-inspection-title" hidden>
@@ -213,7 +213,7 @@
                 <p class="eyebrow">QUICK CONTROL TESTS</p>
                 <h3 id="governance-scenario-title">Explore the existing runtime scenarios</h3>
               </div>
-              <span class="local-runtime-chip"><i></i> Local enforcement engine ready</span>
+              <span class="local-runtime-chip"><i></i> Demonstration enforcement engine ready</span>
             </div>
 
             <div class="governance-scenario-picker" role="group" aria-label="AI governance demonstrations">
@@ -282,11 +282,11 @@
             <div>
               <p class="eyebrow">EXECUTABLE GOVERNANCE DEMONSTRATIONS</p>
               <h2>Run the complete AI control loop.</h2>
-              <p>Choose a fictional finance or healthcare workflow, execute each governed stage, make the human decision, invoke the safe local action adapter and prove the outcome.</p>
+              <p>Choose a fictional finance or healthcare workflow, execute each governed stage, make the human decision, invoke the simulated action adapter and prove the outcome.</p>
             </div>
             <div class="pipeline-hero-proof">
               <span class="live-dot"></span>
-              <div><strong>Local control logic active</strong><small>Interactive local simulation with deterministic model and downstream-system fixtures.</small></div>
+              <div><strong>Demonstration control logic active</strong><small>Shared synthetic simulation with deterministic model and downstream-system fixtures.</small></div>
             </div>
           </section>
 
@@ -294,7 +294,7 @@
             <div class="presenter-console-copy">
               <p class="eyebrow">PRESENTER MODE</p>
               <h3 id="presenter-title">Choose the story you want to demonstrate</h3>
-              <p>Each guided scenario loads fictional source data, applies the same local governance controls and leaves a reviewable execution trail.</p>
+              <p>Each guided scenario loads fictional source data, applies the same governance controls and leaves a reviewable execution trail.</p>
               <div class="presenter-scenarios" role="group" aria-label="Guided demonstration scenarios">
                 <button class="presenter-scenario-button finance" type="button" data-presenter-scenario="finance-success" aria-controls="synthetic-record-content pipeline-workspace">
                   <span class="presenter-scenario-icon" aria-hidden="true">✓</span>
@@ -321,7 +321,7 @@
 
           <section class="truth-boundary" aria-label="Demonstration truth boundary">
             <article class="truth-column is-live">
-              <span class="truth-status"><i></i> LIVE LOCAL CONTROL LOGIC</span>
+              <span class="truth-status"><i></i> LIVE DEMONSTRATION CONTROL LOGIC</span>
               <strong>What the prototype actually executes</strong>
               <p>Policy, state, validation, approvals, action gate, reconciliation and evidence.</p>
             </article>
@@ -338,7 +338,7 @@
           </section>
 
           <section class="pipeline-catalog" id="pipeline-catalog" aria-label="Executable pipeline catalogue"></section>
-          <p class="pipeline-safety-note">Fictional local fixtures only. This demonstration performs no real payment, clinical advice, diagnosis, prescribing, sanctions, fraud or credit check, and no connected EHR or financial-system action.</p>
+          <p class="pipeline-safety-note">Synthetic fixtures only. This demonstration performs no real payment, clinical advice, diagnosis, prescribing, sanctions, fraud or credit check, and no connected EHR or financial-system action.</p>
 
           <section class="synthetic-data-panel panel" aria-labelledby="synthetic-data-title">
             <div class="synthetic-data-heading">
@@ -361,7 +361,7 @@
             <article class="pipeline-config panel">
               <div class="pipeline-config-heading">
                 <div><p class="eyebrow">PIPELINE CONTROLS</p><h3 id="pipeline-config-title">Choose a demonstration</h3></div>
-                <span class="status-pill authorized">Local fixtures only</span>
+                <span class="status-pill authorized">Synthetic fixtures only</span>
               </div>
               <div class="pipeline-config-grid">
                 <label>Industry pipeline<select id="pipeline-select" aria-label="Industry pipeline"></select></label>
@@ -369,7 +369,7 @@
                 <label>Run mode<select id="pipeline-mode-select" aria-label="Run mode"><option value="controlled">Controlled path</option><option value="negative">Negative control test</option></select></label>
                 <button class="button primary pipeline-start" id="pipeline-start">Start governed run</button>
               </div>
-              <p class="pipeline-config-help" id="pipeline-config-help">Select a pipeline and case. Nothing leaves this computer.</p>
+              <p class="pipeline-config-help" id="pipeline-config-help">Select a pipeline and case. Use synthetic data only; no bank, EHR, model provider or enterprise system is contacted.</p>
             </article>
 
             <section class="passport-strip pipeline-passport" id="pipeline-passport" aria-label="Selected governance passport"></section>
@@ -453,7 +453,7 @@
             </article>
 
             <article class="panel runtime-panel span-two">
-              <div class="panel-heading"><div><p class="eyebrow">RUNTIME ACTIVITY</p><h3>Latest governed model calls</h3></div><span class="live-label"><i></i> Local policy decisions</span></div>
+              <div class="panel-heading"><div><p class="eyebrow">RUNTIME ACTIVITY</p><h3>Latest governed model calls</h3></div><span class="live-label"><i></i> Demonstration policy decisions</span></div>
               <div class="runtime-list" id="dashboard-events"></div>
             </article>
 
@@ -494,7 +494,7 @@
           </section>
           <section class="protection-grid">
             <article class="panel simulator-panel">
-              <div class="panel-heading"><div><p class="eyebrow">POLICY SIMULATOR</p><h3>Test an outbound model call</h3></div><span class="simulation-label">Local simulation</span></div>
+              <div class="panel-heading"><div><p class="eyebrow">POLICY SIMULATOR</p><h3>Test an outbound model call</h3></div><span class="simulation-label">Synthetic simulation</span></div>
               <p class="panel-copy">Use fictional demonstration data only. StyrAI detects sensitive patterns, reconciles the model passport and applies the destination policy.</p>
               <form id="call-simulator">
                 <label>AI system<select id="sim-asset" required></select></label>

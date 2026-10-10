@@ -64,6 +64,24 @@ class HashChainedAuditLog:
             handle.write(json.dumps(signed, sort_keys=True, ensure_ascii=False) + "\n")
         return signed
 
+    def rotate(self) -> Path | None:
+        """Move a non-empty log aside so an explicit reset preserves evidence."""
+
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            return None
+        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        rotated = self.path.with_name(
+            f"{self.path.stem}.reset-{timestamp}{self.path.suffix}"
+        )
+        counter = 1
+        while rotated.exists():
+            rotated = self.path.with_name(
+                f"{self.path.stem}.reset-{timestamp}-{counter}{self.path.suffix}"
+            )
+            counter += 1
+        self.path.replace(rotated)
+        return rotated
+
     def verify(self) -> bool:
         previous_hash = self.GENESIS_HASH
         for expected_index, record in enumerate(self._records()):

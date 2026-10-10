@@ -130,7 +130,7 @@ function showToast(message, error = false) {
   showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
-const INCOMPATIBLE_SERVER_MESSAGE = "This page is connected to an older or incompatible StyrAI server. Close its Terminal window and relaunch the updated StyrAI package. Your CSV or JSON file is not the cause.";
+const INCOMPATIBLE_SERVER_MESSAGE = "This page is connected to an older or incompatible StyrAI service. Reload the page or contact the staging owner. Your CSV or JSON file is not the cause.";
 
 function incompatibleServerMessage(status) {
   return status ? `${INCOMPATIBLE_SERVER_MESSAGE} (Server response ${status}.)` : INCOMPATIBLE_SERVER_MESSAGE;
@@ -139,19 +139,27 @@ function incompatibleServerMessage(status) {
 async function request(url, options = {}) {
   let response;
   try {
+    const { headers: suppliedHeaders = {}, ...fetchOptions } = options;
+    const headers = new Headers(suppliedHeaders);
+    const method = String(fetchOptions.method || "GET").toUpperCase();
+    if (method === "POST") headers.set("X-StyrAI-Request", "1");
+    if (fetchOptions.body != null && !(fetchOptions.body instanceof FormData) && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
     response = await fetch(url, {
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-      ...options,
+      credentials: "same-origin",
+      ...fetchOptions,
+      headers,
     });
   } catch (_error) {
-    throw new Error("The local StyrAI server could not be reached. Relaunch StyrAI and try again; the uploaded file has not been evaluated.");
+    throw new Error("The StyrAI service could not be reached. Reload the page or contact the staging owner; the uploaded file has not been evaluated.");
   }
 
   let responseText;
   try {
     responseText = await response.text();
   } catch (_error) {
-    throw new Error("StyrAI could not read the local server response. Relaunch StyrAI and try again; the uploaded file has not been evaluated.");
+    throw new Error("StyrAI could not read the service response. Reload the page or contact the staging owner; the uploaded file has not been evaluated.");
   }
 
   const contentType = (response.headers.get("content-type") || "").toLowerCase();
@@ -327,10 +335,10 @@ function renderUploadAssessment() {
   $("#active-policy-detail").textContent = policyText ? "Will be evaluated separately from regulatory obligations." : "Upload or paste a policy to add stricter clauses to this run.";
   const runButton = $("#run-dataset-assessment");
   if (state.datasetGovernanceAvailable === false) {
-    $("#assessment-run-readiness").textContent = "Updated local engine required";
-    $("#assessment-run-readiness-detail").textContent = "This page is connected to an older StyrAI server. Close its Terminal window and relaunch the updated package. Any loaded CSV or JSON was parsed correctly and is not the cause.";
+    $("#assessment-run-readiness").textContent = "Updated governance engine required";
+    $("#assessment-run-readiness-detail").textContent = "This page is connected to an older StyrAI service. Reload the page or contact the staging owner. Any loaded CSV or JSON was parsed correctly and is not the cause.";
     runButton.disabled = true;
-    runButton.title = "Relaunch the updated StyrAI package to enable dataset governance runs.";
+    runButton.title = "Reload the updated StyrAI service to enable dataset governance runs.";
   } else {
     $("#assessment-run-readiness").textContent = dataset ? `${number(dataset.records.length)} records ready to evaluate` : "Add a dataset to begin";
     $("#assessment-run-readiness-detail").textContent = dataset
@@ -378,7 +386,7 @@ function normalizeRegulationLibrary(payload) {
     provision: entry.provision || entry.article || entry.citation || entry.reference || "Provision not specified",
     requirement: entry.requirement || entry.requirement_summary || entry.summary || entry.text || "Requirement summary unavailable",
     official_source: entry.official_url || entry.official_source || entry.source_url || entry.url || "",
-    version: entry.version || entry.source_version || entry.last_updated || "Version recorded in local library",
+    version: entry.version || entry.source_version || entry.last_updated || "Version recorded in demonstration library",
     applicability: entry.application_or_review_date || entry.applicability || entry.applicability_date || entry.effective_date || "Applicability review required",
     controls: entry.controls || entry.affected_controls || entry.control_ids || [entry.control_id, entry.control_proxy].filter(Boolean),
     authority_type: entry.authority_type || entry.type || "regulation",
@@ -487,7 +495,7 @@ function normalizeAssessmentResult(payload, dataset) {
       if (observedEvidence) normalizedFinding.evidence = observedEvidence;
       return normalizedFinding;
     }),
-    engine: root.engine || root.evaluation_engine || root.rule_set?.engine_version || "StyrAI local governance engine",
+    engine: root.engine || root.evaluation_engine || root.rule_set?.engine_version || "StyrAI demonstration governance engine",
     policy_interpretation: root.policy_interpretation || root.policy_method || (root.rule_set?.internal_policies?.length ? "Activated deterministic policy clauses" : "No internal policy activated"),
     dataset_hash: root.dataset_hash || root.input_hash || root.dataset?.sha256 || "Metadata recorded",
     overall_disposition: summary.overall_disposition || root.overall_disposition || "",
@@ -807,10 +815,10 @@ function renderPipelineCatalog(catalog) {
     const cases = pipelineCases(pipeline);
     return `<button class="pipeline-card ${industryOf(pipeline)} ${active ? "active" : ""}" data-pipeline-id="${esc(id)}">
       <span class="pipeline-card-icon">${industryIcon(pipeline)}</span>
-      <span class="pipeline-card-copy"><small>${esc(industryLabel(pipeline))} pipeline</small><strong>${esc(first(pipeline, ["title", "name"], titleCase(id)))}</strong><span>${esc(first(pipeline, ["description", "summary"], "Execute the complete governed workflow using fictional local data."))}</span></span>
+      <span class="pipeline-card-copy"><small>${esc(industryLabel(pipeline))} pipeline</small><strong>${esc(first(pipeline, ["title", "name"], titleCase(id)))}</strong><span>${esc(first(pipeline, ["description", "summary"], "Execute the complete governed workflow using synthetic data."))}</span></span>
       <span class="pipeline-card-meta"><b>${stages.length}</b> stages · <b>${cases.length}</b> cases <i>${active ? "Selected" : "Open"} →</i></span>
     </button>`;
-  }).join("") || '<article class="panel pipeline-empty"><strong>Pipeline catalogue unavailable</strong><p>The interactive local simulation has not returned any workflows.</p></article>';
+  }).join("") || '<article class="panel pipeline-empty"><strong>Pipeline catalogue unavailable</strong><p>The shared synthetic demonstration has not returned any workflows.</p></article>';
 }
 
 function renderPipelineSelectors(pipeline) {
@@ -826,7 +834,7 @@ function renderPipelineSelectors(pipeline) {
     const id = String(first(item, ["id", "mode"], "controlled"));
     return `<option value="${esc(id)}" ${id === state.selectedMode ? "selected" : ""}>${esc(first(item, ["label", "title"], titleCase(id)))}</option>`;
   }).join("");
-  $("#pipeline-config-title").textContent = first(pipeline, ["title", "name"], "Choose an interactive local simulation");
+  $("#pipeline-config-title").textContent = first(pipeline, ["title", "name"], "Choose a shared synthetic demonstration");
   const selectedCase = currentCase(pipeline);
   $("#pipeline-config-help").textContent = first(selectedCase, ["subtitle", "description"], "Synthetic case data; no external model or system is connected.");
 }
@@ -868,7 +876,7 @@ function syntheticRecordKey(pipeline = currentPipeline(), selectedCase = current
   return caseId ? `${pipelineId(pipeline)}/${caseId}` : null;
 }
 
-function renderSyntheticLabel(record, detail = "Interactive local simulation") {
+function renderSyntheticLabel(record, detail = "Shared synthetic demonstration") {
   return `<div class="synthetic-data-banner"><span class="synthetic-data-badge">FICTIONAL · SYNTHETIC DATA</span><span>${esc(detail)}</span><strong>No external system is contacted</strong></div>`;
 }
 
@@ -924,7 +932,7 @@ function renderExecutionStateCard(record, pipeline, phase) {
       ? `<div class="state-action-result"><small>SIGNED VISIT SUMMARY</small><strong>${esc(summary.diagnosis || "Summary signed")}</strong><p>${esc(summary.summary || summary.follow_up || "The approved summary was written to the simulated EHR.")}</p><span>Portal queue: ${portalQueue.length ? esc(titleCase(portalQueue[0].status)) : "Empty"}</span></div>`
       : '<div class="state-action-empty"><strong>No signed summary</strong><span>Secure portal queue is empty</span></div>')
     : (release
-      ? `<div class="state-action-result"><small>SIMULATED PAYMENT RELEASE</small><strong>${esc(formatAmount(release.amount, release.currency || record.currency))}</strong><p>Released into the interactive local simulation.</p><span>External side effect: ${release.external_side_effect ? "Yes" : "No"}</span></div>`
+      ? `<div class="state-action-result"><small>SIMULATED PAYMENT RELEASE</small><strong>${esc(formatAmount(release.amount, release.currency || record.currency))}</strong><p>Released into the shared synthetic demonstration.</p><span>External side effect: ${release.external_side_effect ? "Yes" : "No"}</span></div>`
       : '<div class="state-action-empty"><strong>No payment released</strong><span>Batch remains held for review</span></div>');
   return `<article class="execution-state-card ${phase.toLowerCase()}"><header><span>${esc(phase)}</span>${operationalStatus(record.operational_status)}</header><div class="execution-state-facts"><div><small>Status</small><strong>${esc(titleCase(record.operational_status))}</strong></div><div><small>Record version</small><strong>v${esc(record.record_version)}</strong></div></div>${actionDetail}</article>`;
 }
@@ -933,7 +941,7 @@ function renderExecutionComparison(pipeline, run) {
   const before = run?.execution?.before_record;
   const after = run?.execution?.after_record;
   if (!before || !after) return "";
-  return `<section class="execution-comparison"><header><div><small>EXECUTION OUTCOME</small><h3>Authoritative source state changed exactly once</h3><p>The approved action is reconciled against the interactive local simulation.</p></div>${status("verified", "Reconciled")}</header><div class="execution-comparison-grid">${renderExecutionStateCard(before, pipeline, "Before")}<div class="comparison-arrow" aria-hidden="true">→</div>${renderExecutionStateCard(after, pipeline, "After")}</div></section>`;
+  return `<section class="execution-comparison"><header><div><small>EXECUTION OUTCOME</small><h3>Authoritative source state changed exactly once</h3><p>The approved action is reconciled against the shared synthetic demonstration.</p></div>${status("verified", "Reconciled")}</header><div class="execution-comparison-grid">${renderExecutionStateCard(before, pipeline, "Before")}<div class="comparison-arrow" aria-hidden="true">→</div>${renderExecutionStateCard(after, pipeline, "After")}</div></section>`;
 }
 
 function renderSyntheticRecordPanel(pipeline = currentPipeline(), run = currentPipelineRun()) {
@@ -944,7 +952,7 @@ function renderSyntheticRecordPanel(pipeline = currentPipeline(), run = currentP
   const record = state.syntheticRecordKey === expectedKey ? state.syntheticRecord : null;
   if (!record) {
     recordStatus.innerHTML = status("pending", "Loading synthetic record");
-    content.innerHTML = `${renderSyntheticLabel({}, "Interactive local simulation")}<div class="synthetic-record-loading"><span></span><div><strong>Loading the full fictional source record</strong><p>The record will appear here before any governed run begins.</p></div></div>`;
+    content.innerHTML = `${renderSyntheticLabel({}, "Shared synthetic demonstration")}<div class="synthetic-record-loading"><span></span><div><strong>Loading the full fictional source record</strong><p>The record will appear here before any governed run begins.</p></div></div>`;
     return;
   }
   recordStatus.innerHTML = `${status("verified", "Synthetic record loaded")}<small>${esc(record.case_id)} · v${esc(record.record_version)}</small>`;
@@ -976,7 +984,7 @@ async function refreshSyntheticRecord({ force = false } = {}) {
     const content = $("#synthetic-record-content");
     const recordStatus = $("#synthetic-record-status");
     if (recordStatus) recordStatus.innerHTML = status("blocked", "Record unavailable");
-    if (content) content.innerHTML = `${renderSyntheticLabel({}, "Interactive local simulation")}<div class="synthetic-record-error"><strong>The fictional record could not be loaded.</strong><p>${esc(error.message)}</p></div>`;
+    if (content) content.innerHTML = `${renderSyntheticLabel({}, "Shared synthetic demonstration")}<div class="synthetic-record-error"><strong>The fictional record could not be loaded.</strong><p>${esc(error.message)}</p></div>`;
   }
 }
 
@@ -999,11 +1007,11 @@ function renderSourceApplication(pipeline, run) {
     : `<div class="pipeline-source-flow">
         <div class="source-flow-card"><small>CURRENT PIPELINE STATE</small><strong>${esc(titleCase(run.status))}</strong><p>${esc(first(list(run.stages).find((item) => item.status === "ready" || item.status === "waiting"), ["detail"], "Advance the governed pipeline when ready."))}</p></div>
         ${run.provider_payload ? `<details class="pipeline-detail"><summary>Governance-safe provider payload</summary><pre>${esc(typeof run.provider_payload === "string" ? run.provider_payload : JSON.stringify(run.provider_payload, null, 2))}</pre></details>` : ""}
-        ${output ? `<div class="source-output"><small>LOCAL MODEL OUTPUT</small><p>${esc(typeof output === "string" ? output : JSON.stringify(output, null, 2))}</p></div>` : ""}
+        ${output ? `<div class="source-output"><small>SIMULATED MODEL OUTPUT</small><p>${esc(typeof output === "string" ? output : JSON.stringify(output, null, 2))}</p></div>` : ""}
         ${validation ? `<div class="validation-summary"><div><small>OUTPUT VALIDATION</small>${status(validation.status || (checks.every((item) => item.passed) ? "effective" : "blocked"))}</div>${checks.map((check) => `<span class="validation-check ${check.passed ? "passed" : "failed"}"><b>${check.passed ? "✓" : "×"}</b>${esc(first(check, ["label", "check_id"], "Validation check"))}</span>`).join("")}</div>` : ""}
       </div>`;
   $("#pipeline-source").innerHTML = `<header class="workbench-header"><div class="workbench-brand"><span>${industryOf(pipeline) === "healthcare" ? "EHR" : "FIN"}</span><div><strong>${esc(sourceName)}</strong><small>${esc(organisation)}</small></div></div><div class="protected-badge"><span>✓</span><div><strong>Protected by StyrAI</strong><small>Enforcement active</small></div></div></header>
-    <div class="workbench-body pipeline-workbench-body"><aside class="case-sidebar pipeline-case-sidebar"><p class="mini-label">FICTIONAL SOURCE CASE</p><div class="customer-avatar">${industryOf(pipeline) === "healthcare" ? "HC" : "FS"}</div><h3>${esc(caseTitle)}</h3><p class="case-id">${esc(caseId)} · ${esc(subtitle)}</p><dl>${facts.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(short(value, 80))}</dd></div>`).join("")}<div><dt>Data class</dt><dd>${status(classification)}</dd></div></dl><div class="source-boundary"><span>⌂</span><p><strong>Source boundary</strong>Synthetic data stays inside this interactive local simulation.</p></div></aside><section class="copilot-workspace pipeline-copilot"><div class="copilot-heading"><div><span class="copilot-mark">✦</span><div><strong>${esc(first(pipeline, ["title", "name"], "Governed AI pipeline"))}</strong><small>${esc(industryLabel(pipeline))} · interactive local simulation</small></div></div><span class="model-chip">${esc(first(run?.model || {}, ["version", "adapter"], "Not invoked"))}</span></div><div class="conversation pipeline-conversation">${workState}</div></section></div>`;
+    <div class="workbench-body pipeline-workbench-body"><aside class="case-sidebar pipeline-case-sidebar"><p class="mini-label">FICTIONAL SOURCE CASE</p><div class="customer-avatar">${industryOf(pipeline) === "healthcare" ? "HC" : "FS"}</div><h3>${esc(caseTitle)}</h3><p class="case-id">${esc(caseId)} · ${esc(subtitle)}</p><dl>${facts.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(short(value, 80))}</dd></div>`).join("")}<div><dt>Data class</dt><dd>${status(classification)}</dd></div></dl><div class="source-boundary"><span>⌂</span><p><strong>Source boundary</strong>Synthetic data stays inside this StyrAI demonstration environment.</p></div></aside><section class="copilot-workspace pipeline-copilot"><div class="copilot-heading"><div><span class="copilot-mark">✦</span><div><strong>${esc(first(pipeline, ["title", "name"], "Governed AI pipeline"))}</strong><small>${esc(industryLabel(pipeline))} · shared synthetic demonstration</small></div></div><span class="model-chip">${esc(first(run?.model || {}, ["version", "adapter"], "Not invoked"))}</span></div><div class="conversation pipeline-conversation">${workState}</div></section></div>`;
 }
 
 function renderPipelineOverlay(pipeline, run) {
@@ -1012,8 +1020,8 @@ function renderPipelineOverlay(pipeline, run) {
   const incidentIds = list(run?.linked_incident_ids);
   const automationIds = list(run?.linked_automation_run_ids);
   const runtime = run?.runtime_event || {};
-  const intervention = run ? `<div class="overlay-card ${["blocked", "denied"].includes(run.status) ? "block-card" : ""}"><h4>${esc(heading)}</h4><p>${esc(detail)}</p><div class="overlay-facts"><div class="overlay-fact"><span>Provider invoked</span><strong>${run.provider_invoked ? "Yes · simulated locally" : "No"}</strong></div><div class="overlay-fact"><span>Downstream invoked</span><strong>${run.downstream_invoked ? "Yes · simulated locally" : "No"}</strong></div><div class="overlay-fact"><span>Runtime decision</span><strong>${esc(titleCase(first(runtime, ["decision", "status"], run.status)))}</strong></div><div class="overlay-fact"><span>Raw source in evidence</span><strong>No</strong></div>${incidentIds.length ? `<div class="overlay-fact"><span>Linked incidents</span><strong>${esc(incidentIds.join(", "))}</strong></div>` : ""}${automationIds.length ? `<div class="overlay-fact"><span>Automations</span><strong>${esc(automationIds.join(", "))}</strong></div>` : ""}</div>${run.reconciliation ? `<div class="provider-payload"><strong>Reconciliation</strong><br>${esc(typeof run.reconciliation === "string" ? run.reconciliation : JSON.stringify(run.reconciliation, null, 2))}</div>` : ""}</div>` : '<div class="overlay-card"><h4>Controls are ready</h4><p>Start a run to execute identity, data, model, validation, human-oversight and action controls.</p><div class="overlay-facts"><div class="overlay-fact"><span>Unknown routes</span><strong>Fail closed</strong></div><div class="overlay-fact"><span>External connections</span><strong>None</strong></div><div class="overlay-fact"><span>Environment</span><strong>Interactive local simulation</strong></div></div></div>';
-  $("#pipeline-overlay").innerHTML = `<header class="overlay-header"><div><span class="overlay-mark">S</span><div><strong>StyrAI runtime</strong><small>${esc(industryLabel(pipeline))} enforcement overlay</small></div></div><span class="overlay-connection"><i></i> Local runtime</span></header><div class="overlay-status ${esc(statusClass)}"><div class="overlay-status-line"><span class="overlay-status-label">${esc(run ? titleCase(run.status) : "ENFORCEMENT READY")}</span>${run ? status(run.status) : '<span class="status-pill authorized">Local</span>'}</div><h3>${esc(heading)}</h3><p>${esc(detail)}</p></div><div class="overlay-timeline">${steps.map(executionStep).join("")}</div><div class="overlay-intervention">${intervention}</div>`;
+  const intervention = run ? `<div class="overlay-card ${["blocked", "denied"].includes(run.status) ? "block-card" : ""}"><h4>${esc(heading)}</h4><p>${esc(detail)}</p><div class="overlay-facts"><div class="overlay-fact"><span>Provider invoked</span><strong>${run.provider_invoked ? "Yes · simulated" : "No"}</strong></div><div class="overlay-fact"><span>Downstream invoked</span><strong>${run.downstream_invoked ? "Yes · simulated" : "No"}</strong></div><div class="overlay-fact"><span>Runtime decision</span><strong>${esc(titleCase(first(runtime, ["decision", "status"], run.status)))}</strong></div><div class="overlay-fact"><span>Raw source in evidence</span><strong>No</strong></div>${incidentIds.length ? `<div class="overlay-fact"><span>Linked incidents</span><strong>${esc(incidentIds.join(", "))}</strong></div>` : ""}${automationIds.length ? `<div class="overlay-fact"><span>Automations</span><strong>${esc(automationIds.join(", "))}</strong></div>` : ""}</div>${run.reconciliation ? `<div class="provider-payload"><strong>Reconciliation</strong><br>${esc(typeof run.reconciliation === "string" ? run.reconciliation : JSON.stringify(run.reconciliation, null, 2))}</div>` : ""}</div>` : '<div class="overlay-card"><h4>Controls are ready</h4><p>Start a run to execute identity, data, model, validation, human-oversight and action controls.</p><div class="overlay-facts"><div class="overlay-fact"><span>Unknown routes</span><strong>Fail closed</strong></div><div class="overlay-fact"><span>External connections</span><strong>None</strong></div><div class="overlay-fact"><span>Environment</span><strong>Shared synthetic demonstration</strong></div></div></div>';
+  $("#pipeline-overlay").innerHTML = `<header class="overlay-header"><div><span class="overlay-mark">S</span><div><strong>StyrAI runtime</strong><small>${esc(industryLabel(pipeline))} enforcement overlay</small></div></div><span class="overlay-connection"><i></i> Demonstration runtime</span></header><div class="overlay-status ${esc(statusClass)}"><div class="overlay-status-line"><span class="overlay-status-label">${esc(run ? titleCase(run.status) : "ENFORCEMENT READY")}</span>${run ? status(run.status) : '<span class="status-pill authorized">Ready</span>'}</div><h3>${esc(heading)}</h3><p>${esc(detail)}</p></div><div class="overlay-timeline">${steps.map(executionStep).join("")}</div><div class="overlay-intervention">${intervention}</div>`;
 }
 
 function renderPipelineActionDock(run, pipeline) {
@@ -1031,11 +1039,12 @@ function renderPipelineActionDock(run, pipeline) {
   const requiredApprovals = Number(run.governed_action?.decision?.required_approvals || 1);
   const detail = review ? `${approvedBy.length} of ${requiredApprovals} required approvals recorded. ${statusDetail}` : statusDetail;
   const approvers = list(pipeline?.approvers);
-  const availableApprovers = approvers.filter((item) => !approvedBy.includes(first(item, ["approver_id", "id"], "")));
+  const usedDemonstrationApprovers = list(run.approval_contexts).map((item) => item.demonstration_approver_id);
+  const availableApprovers = approvers.filter((item) => !usedDemonstrationApprovers.includes(first(item, ["approver_id", "id"], "")));
   const reviewerControl = availableApprovers.length
     ? `<select id="pipeline-reviewer">${availableApprovers.map((item) => `<option value="${esc(first(item, ["approver_id", "id"], ""))}">${esc(first(item, ["label", "name"], first(item, ["approver_id", "id"], "Reviewer")))}</option>`).join("")}</select>`
     : `<input id="pipeline-reviewer" value="${industryOf(run) === "healthcare" ? "attending-clinician-demo" : "payments-manager-demo"}" />`;
-  const reviewForm = review ? `<div class="pipeline-review-form"><label>Independent reviewer${reviewerControl}</label><label>Rationale<textarea id="pipeline-rationale" rows="2">Reviewed the fictional record, model output and validation results.</textarea></label></div>` : "";
+  const reviewForm = review ? `<div class="pipeline-review-form"><label>Demonstration reviewer role${reviewerControl}</label><label>Rationale<textarea id="pipeline-rationale" rows="2">Reviewed the fictional record, model output and validation results.</textarea></label></div>` : "";
   dock.innerHTML = `<div class="pipeline-dock-head"><div><p class="eyebrow">VALID NEXT ACTION</p><h3>${esc(heading)}</h3><p>${esc(detail)}</p></div>${status(run.status)}</div>${reviewForm}<div class="pipeline-dock-actions">
     <button class="button secondary pipeline-advance-next" ${canAdvance ? "" : "disabled"}>Step next</button>
     <button class="button primary pipeline-advance-review" ${canAdvance ? "" : "disabled"}>Run to review</button>
@@ -1560,7 +1569,7 @@ async function decidePipeline(button, approved) {
     button,
     () => request(`/api/pipeline-runs/${encodeURIComponent(run.run_id)}/decision`, {
       method: "POST",
-      body: JSON.stringify({ approver_id: approver, approved, rationale }),
+      body: JSON.stringify({ demo_approver_id: approver, approved, rationale }),
     }),
     approved
       ? "Independent approval recorded; the reviewed action is authorised."
@@ -1577,7 +1586,7 @@ async function executePipeline(button) {
       method: "POST",
       body: "{}",
     }),
-    "Authorised action executed in the interactive local simulation and reconciled."
+    "Authorised action executed in the shared synthetic demonstration and reconciled."
   );
 }
 
@@ -1730,7 +1739,7 @@ function updatePresenterGuide(scenarioId) {
   const guide = $("#presenter-guide");
   const scenario = presenterScenarios[scenarioId];
   if (!guide || !scenario) return;
-  guide.innerHTML = `<div class="presenter-guide-heading"><small>PRESENTER PATH · INTERACTIVE LOCAL SIMULATION</small><h3>${esc(scenario.title)}</h3><p>${esc(scenario.outcome)}</p></div><ol>${scenario.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><div class="presenter-guide-note"><strong>Say this clearly:</strong> All people, organisations and records are fictional. The governance workflow is functional; model and downstream-system adapters are simulated locally.</div>`;
+  guide.innerHTML = `<div class="presenter-guide-heading"><small>PRESENTER PATH · SHARED SYNTHETIC DEMONSTRATION</small><h3>${esc(scenario.title)}</h3><p>${esc(scenario.outcome)}</p></div><ol>${scenario.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><div class="presenter-guide-note"><strong>Say this clearly:</strong> All people, organisations and records are fictional. The governance workflow is functional; model and downstream-system adapters are simulated in this demonstration environment.</div>`;
   $$("[data-presenter-scenario]").forEach((button) => {
     button.classList.toggle("active", button.dataset.presenterScenario === scenarioId);
     button.setAttribute("aria-pressed", button.dataset.presenterScenario === scenarioId ? "true" : "false");
@@ -2075,7 +2084,7 @@ $("#reset-platform").addEventListener("click", async (event) => {
     state.governanceResult = null;
     $("#decision-result").classList.add("hidden");
     $("#empty-decision").classList.remove("hidden");
-  }, "Interactive local simulation reset to its governed baseline.");
+  }, "Shared synthetic demonstration reset to its governed baseline.");
 });
 
 refresh()

@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Account-level budget guardrail for the StyrAI Lightsail staging service.
+
+Parameters:
+  BudgetNotificationEmail:
+    Type: String
+    Default: djmur2@gmail.com
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 15
+    MinValue: 7
+
+Resources:
+  StyrAILightsailBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: styrai-lightsail-staging-monthly
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        CostFilters:
+          Service:
+            - Amazon Lightsail
+      NotificationsWithSubscribers:
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: ACTUAL
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetNotificationEmail
+              SubscriptionType: EMAIL
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: FORECASTED
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetNotificationEmail
+              SubscriptionType: EMAIL
