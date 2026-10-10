@@ -69,7 +69,9 @@ None of these values gives a website user AWS access.
 
 The initial deployment can then be launched from **GitHub → Actions → Deploy
 StyrAI staging → Run workflow**. Subsequent merges to `main` deploy
-automatically after the test suite and container build succeed.
+automatically after the test suite and container build succeed. Each workflow
+attempt publishes a uniquely tagged immutable image, so an operator can also run
+the workflow again from the same revision after changing deployment secrets.
 
 ## Sharing with a collaborator
 
@@ -98,6 +100,22 @@ container restart, and current in-memory uploads and run results are cleared.
 Signing out removes the active session from the single-node session registry,
 so a copied old cookie cannot be replayed. The application version in the
 GitHub deployment summary identifies the deployed commit.
+
+## Updating staging logins
+
+`STYRAI_AUTH_USERS_JSON` is one complete username-to-password-hash mapping, not
+one secret per user. To add, remove or rotate a login, generate salted hashes
+with `python3 -m murphyos.auth`, build the complete replacement mapping, and
+replace the repository secret without printing the mapping or its hashes. Keep
+all accounts that should continue working in that replacement value. GitHub
+does not expose the previous secret after it has been stored.
+
+Changing the repository secret does not update the running Lightsail container.
+After updating it, run **Deploy StyrAI staging** manually from `main` and wait
+for the exact deployment version to become current. Then verify a fresh login
+for every retained account and the new or rotated account. Do not rotate
+`STYRAI_SESSION_SECRET` merely to change a password. Any deployment signs out
+current users and clears the demonstration's in-memory uploads and run results.
 
 ## Rollback
 
