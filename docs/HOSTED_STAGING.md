@@ -10,8 +10,9 @@ who will change source code or review pull requests.
 - **Hosting:** one Lightsail Nano container node in `eu-north-1` (Stockholm).
 - **Expected cost:** USD 7 per month while the service exists, plus private
   image storage and transfer above the included Lightsail allowance.
-- **Access:** HTTP Basic authentication enforced by the application; the public
-  health endpoint contains no business data.
+- **Access:** branded form login backed by PBKDF2 password verification and a
+  signed, Secure, HttpOnly, SameSite=Strict session cookie. The public health
+  endpoint contains no business data.
 - **Deployment:** every verified change merged to `main` is built by GitHub
   Actions, stored in a private ECR repository and deployed automatically using
   short-lived AWS credentials.
@@ -60,9 +61,11 @@ aws cloudformation deploy \
 ```
 
 Then copy the `GitHubDeployRoleArn` stack output into the repository variable
-`AWS_DEPLOY_ROLE_ARN`, and store the generated authentication mapping as the
-repository secret `STYRAI_AUTH_USERS_JSON`. Neither value gives a website user
-AWS access.
+`AWS_DEPLOY_ROLE_ARN`. Store the generated authentication mapping as the
+repository secret `STYRAI_AUTH_USERS_JSON`, and store a separate high-entropy
+secret of at least 32 bytes as `STYRAI_SESSION_SECRET`. The application fails
+closed when website authentication is enabled without this signing secret.
+None of these values gives a website user AWS access.
 
 The initial deployment can then be launched from **GitHub → Actions → Deploy
 StyrAI staging → Run workflow**. Subsequent merges to `main` deploy
@@ -90,8 +93,10 @@ A source-code contributor works through GitHub:
 4. merge after review and passing checks; and
 5. allow the staging workflow to publish the update.
 
-Existing staging sessions can be interrupted during a deployment, and current
-in-memory uploads and run results are cleared. The application version in the
+Existing staging sessions are intentionally invalidated during a deployment or
+container restart, and current in-memory uploads and run results are cleared.
+Signing out removes the active session from the single-node session registry,
+so a copied old cookie cannot be replayed. The application version in the
 GitHub deployment summary identifies the deployed commit.
 
 ## Rollback

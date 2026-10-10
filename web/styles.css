@@ -549,3 +549,4 @@ footer{display:flex;justify-content:space-between;gap:20px;align-items:center;pa
   .assessment-run-actions { display: grid; grid-template-columns: 1fr; }
   .regulation-reference-card dl > div { grid-template-columns: 1fr; gap: 3px; }
 }
+.logout-form{display:inline-flex;margin:0}.logout-form .button{white-space:nowrap}

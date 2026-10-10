@@ -76,17 +76,21 @@ jobs:
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
           STYRAI_AUTH_USERS_JSON: ${{ secrets.STYRAI_AUTH_USERS_JSON }}
+          STYRAI_SESSION_SECRET: ${{ secrets.STYRAI_SESSION_SECRET }}
         run: |
           test -n "$STYRAI_AUTH_USERS_JSON"
+          test -n "$STYRAI_SESSION_SECRET"
           jq -n \
             --arg image "$IMAGE_URI" \
             --arg auth "$STYRAI_AUTH_USERS_JSON" \
+            --arg session_secret "$STYRAI_SESSION_SECRET" \
             '{
               containers: {
                 styrai: {
                   image: $image,
                   environment: {
                     STYRAI_AUTH_USERS_JSON: $auth,
+                    STYRAI_SESSION_SECRET: $session_secret,
                     STYRAI_DEPLOYMENT: "staging"
                   },
                   ports: {"8080": "HTTP"}

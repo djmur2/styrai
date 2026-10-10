@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import binascii
+import hashlib
+import html
 import json
+import secrets
 import threading
 import time
 import webbrowser
@@ -13,14 +14,22 @@ from collections.abc import Mapping, Sequence
 from email import policy as email_policy
 from email.parser import BytesParser
 from http import HTTPStatus
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import urlopen
 
 from .ai_governance import AIGovernanceControlPlane
-from .auth import load_auth_users, verify_password
+from .auth import (
+    SESSION_TTL_SECONDS,
+    create_session_token,
+    load_auth_users,
+    load_session_secret,
+    verify_password,
+    verify_session_token,
+)
 from .audit import AuditIntegrityError, HashChainedAuditLog
 from .dataset_governance import DatasetGovernanceEngine
 from .demo import demo_policy, demo_registry
@@ -407,8 +416,16 @@ class DemoApplication:
 class StyrAIRequestHandler(BaseHTTPRequestHandler):
     application: DemoApplication
     auth_users: Mapping[str, str] = {}
+    session_secret: bytes | None = None
+    active_sessions: dict[str, int] = {}
+    active_sessions_lock = threading.Lock()
     authenticated_username: str | None = None
     web_root = Path(__file__).resolve().parent.parent / "web"
+
+    SESSION_COOKIE = "__Host-styrai_session"
+    LOGIN_CSRF_COOKIE = "styrai_login_csrf"
+    LOGIN_CSRF_MAX_AGE = 10 * 60
+    MAX_ACTIVE_SESSIONS = 4096
 
     SECURITY_HEADERS = {
         "Cache-Control": "no-store",
@@ -451,39 +468,295 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def _send_html(
+        self,
+        content: str,
+        status: HTTPStatus = HTTPStatus.OK,
+        extra_headers: Sequence[tuple[str, str]] = (),
+    ) -> None:
+        encoded = content.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        for name, value in extra_headers:
+            self.send_header(name, value)
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _redirect(
+        self,
+        location: str,
+        *,
+        status: HTTPStatus = HTTPStatus.SEE_OTHER,
+        extra_headers: Sequence[tuple[str, str]] = (),
+    ) -> None:
+        self.send_response(status)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        for name, value in extra_headers:
+            self.send_header(name, value)
+        self.end_headers()
+
+    def _cookie_value(self, name: str) -> str:
+        raw_cookie = getattr(self, "headers", {}).get("Cookie", "")
+        if not raw_cookie or len(raw_cookie) > 8192:
+            return ""
+        cookies = SimpleCookie()
+        try:
+            cookies.load(raw_cookie)
+        except CookieError:
+            return ""
+        morsel = cookies.get(name)
+        return morsel.value if morsel is not None else ""
+
+    @classmethod
+    def _session_cookie(cls, token: str) -> str:
+        return (
+            f"{cls.SESSION_COOKIE}={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; "
+            "Secure; HttpOnly; SameSite=Strict"
+        )
+
+    @classmethod
+    def _clear_cookie(cls, name: str, path: str = "/") -> str:
+        return (
+            f"{name}=; Path={path}; Max-Age=0; "
+            "Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=Strict"
+        )
+
+    @staticmethod
+    def _safe_next_path(candidate: str | None) -> str:
+        if not candidate or len(candidate) > 2048:
+            return "/"
+        parsed = urlparse(candidate)
+        if (
+            parsed.scheme
+            or parsed.netloc
+            or not candidate.startswith("/")
+            or candidate.startswith("//")
+            or "\\" in candidate
+            or any(character in candidate for character in "\r\n")
+        ):
+            return "/"
+        return candidate
+
+    def _login_url(self) -> str:
+        next_path = self._safe_next_path(getattr(self, "path", "/"))
+        return f"/login?{urlencode({'next': next_path})}"
+
+    @staticmethod
+    def _session_fingerprint(token: str) -> str:
+        return hashlib.sha256(token.encode("ascii", errors="ignore")).hexdigest()
+
+    def _register_session(self, token: str) -> None:
+        now = int(time.time())
+        fingerprint = self._session_fingerprint(token)
+        with self.active_sessions_lock:
+            expired = [
+                key for key, expiry in self.active_sessions.items() if expiry <= now
+            ]
+            for key in expired:
+                self.active_sessions.pop(key, None)
+            while len(self.active_sessions) >= self.MAX_ACTIVE_SESSIONS:
+                oldest = min(self.active_sessions, key=self.active_sessions.get)
+                self.active_sessions.pop(oldest, None)
+            self.active_sessions[fingerprint] = now + SESSION_TTL_SECONDS
+
+    def _session_is_active(self, token: str) -> bool:
+        if not token:
+            return False
+        now = int(time.time())
+        fingerprint = self._session_fingerprint(token)
+        with self.active_sessions_lock:
+            expiry = self.active_sessions.get(fingerprint)
+            if expiry is None:
+                return False
+            if expiry <= now:
+                self.active_sessions.pop(fingerprint, None)
+                return False
+            return True
+
+    def _revoke_session(self, token: str) -> None:
+        if not token:
+            return
+        with self.active_sessions_lock:
+            self.active_sessions.pop(self._session_fingerprint(token), None)
+
     def _authenticate(self) -> bool:
         self.authenticated_username = None
         if not self.auth_users:
             return True
+        if self.session_secret is None:
+            return False
+        token = self._cookie_value(self.SESSION_COOKIE)
+        username = verify_session_token(
+            token,
+            self.session_secret,
+            self.auth_users,
+        )
+        if username is not None and self._session_is_active(token):
+            self.authenticated_username = username
+            return True
+        return False
 
-        authorization = getattr(self, "headers", {}).get("Authorization", "")
-        scheme, separator, encoded_credentials = authorization.partition(" ")
-        username = ""
-        password = ""
-        if separator and scheme.lower() == "basic":
-            try:
-                decoded = base64.b64decode(
-                    encoded_credentials.strip(), validate=True
-                ).decode("utf-8")
-                username, credential_separator, password = decoded.partition(":")
-                if not credential_separator:
-                    username = ""
-            except (binascii.Error, UnicodeDecodeError, ValueError):
-                username = ""
+    def _reject_unauthenticated(self, path: str) -> None:
+        if path.startswith("/api/"):
+            self._send_json(
+                {
+                    "error": "Authentication is required.",
+                    "login_url": self._login_url(),
+                },
+                HTTPStatus.UNAUTHORIZED,
+            )
+            return
+        self._redirect(self._login_url(), status=HTTPStatus.FOUND)
 
+    def _read_form(self) -> dict[str, str]:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise ValueError("Invalid form length.") from exc
+        if length <= 0 or length > 16_384:
+            raise ValueError("Invalid form submission.")
+        content_type = self.headers.get("Content-Type", "")
+        if not content_type.lower().startswith("application/x-www-form-urlencoded"):
+            raise ValueError("Expected a browser form submission.")
+        raw = self.rfile.read(length)
+        try:
+            fields = parse_qs(
+                raw.decode("utf-8"),
+                keep_blank_values=True,
+                max_num_fields=8,
+                strict_parsing=True,
+            )
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ValueError("Invalid form submission.") from exc
+        return {name: values[-1] for name, values in fields.items() if values}
+
+    def _render_login(
+        self,
+        *,
+        next_path: str = "/",
+        username: str = "",
+        error: str = "",
+        status: HTTPStatus = HTTPStatus.OK,
+    ) -> None:
+        csrf_token = secrets.token_urlsafe(32)
+        safe_next = self._safe_next_path(next_path)
+        error_markup = (
+            f'<p class="login-error" role="alert">{html.escape(error)}</p>'
+            if error
+            else ""
+        )
+        content = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Sign in to the StyrAI governance demonstration" />
+    <title>Sign in · StyrAI</title>
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-card" aria-labelledby="login-title">
+        <header class="login-brand">
+          <span class="login-mark" aria-hidden="true">S</span>
+          <span><strong>StyrAI</strong><small>AI governance operations</small></span>
+        </header>
+        <div class="login-copy">
+          <p class="eyebrow">SECURE STAGING DEMONSTRATION</p>
+          <h1 id="login-title">Sign in to the control plane</h1>
+          <p>Use the access details provided by the StyrAI team. This environment accepts synthetic demonstration data only.</p>
+        </div>
+        {error_markup}
+        <form method="post" action="/login" class="login-form">
+          <input type="hidden" name="csrf_token" value="{html.escape(csrf_token, quote=True)}" />
+          <input type="hidden" name="next" value="{html.escape(safe_next, quote=True)}" />
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" value="{html.escape(username, quote=True)}" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+          <button type="submit">Sign in securely</button>
+        </form>
+        <footer><span aria-hidden="true">✓</span> Encrypted connection · Signed session · No production data</footer>
+      </section>
+    </main>
+  </body>
+</html>
+"""
+        csrf_cookie = (
+            f"{self.LOGIN_CSRF_COOKIE}={csrf_token}; Path=/login; "
+            f"Max-Age={self.LOGIN_CSRF_MAX_AGE}; Secure; HttpOnly; SameSite=Strict"
+        )
+        self._send_html(
+            content,
+            status,
+            (("Set-Cookie", csrf_cookie),),
+        )
+
+    def _handle_login(self) -> None:
+        if not self.auth_users:
+            self._redirect("/")
+            return
+        try:
+            fields = self._read_form()
+        except ValueError as exc:
+            self._render_login(error=str(exc), status=HTTPStatus.BAD_REQUEST)
+            return
+        next_path = self._safe_next_path(fields.get("next"))
+        submitted_csrf = fields.get("csrf_token", "")
+        cookie_csrf = self._cookie_value(self.LOGIN_CSRF_COOKIE)
+        if (
+            not submitted_csrf
+            or not cookie_csrf
+            or not secrets.compare_digest(submitted_csrf, cookie_csrf)
+        ):
+            self._render_login(
+                next_path=next_path,
+                username=fields.get("username", ""),
+                error="The sign-in form expired. Please try again.",
+                status=HTTPStatus.FORBIDDEN,
+            )
+            return
+        username = fields.get("username", "")
+        password = fields.get("password", "")
         stored_hash = self.auth_users.get(username)
         comparison_hash = stored_hash or next(iter(self.auth_users.values()))
         authenticated = verify_password(password, comparison_hash)
-        if stored_hash is not None and authenticated:
-            self.authenticated_username = username
-            return True
-
-        self._send_json(
-            {"error": "Authentication is required."},
-            HTTPStatus.UNAUTHORIZED,
-            {"WWW-Authenticate": 'Basic realm="StyrAI staging", charset="UTF-8"'},
+        if stored_hash is None or not authenticated:
+            self._render_login(
+                next_path=next_path,
+                username=username,
+                error="The username or password was not recognised.",
+                status=HTTPStatus.UNAUTHORIZED,
+            )
+            return
+        if self.session_secret is None:
+            self._send_json(
+                {"error": "Authentication is not configured."},
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            return
+        token = create_session_token(username, self.session_secret)
+        self._register_session(token)
+        self._redirect(
+            next_path,
+            extra_headers=(
+                ("Set-Cookie", self._session_cookie(token)),
+                (
+                    "Set-Cookie",
+                    self._clear_cookie(self.LOGIN_CSRF_COOKIE, path="/login"),
+                ),
+            ),
         )
-        return False
+
+    def _handle_logout(self) -> None:
+        self._revoke_session(self._cookie_value(self.SESSION_COOKIE))
+        self.authenticated_username = None
+        self._redirect(
+            "/login",
+            extra_headers=(("Set-Cookie", self._clear_cookie(self.SESSION_COOKIE)),),
+        )
 
     def _require_styrai_request_header(self) -> bool:
         if not self.auth_users:
@@ -601,7 +874,22 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/login.css":
+            self._send_static("login.css", "text/css; charset=utf-8")
+            return
+        if path == "/login":
+            if self._authenticate():
+                query = parse_qs(urlparse(self.path).query)
+                self._redirect(
+                    self._safe_next_path(query.get("next", ["/"])[-1]),
+                    status=HTTPStatus.FOUND,
+                )
+                return
+            query = parse_qs(urlparse(self.path).query)
+            self._render_login(next_path=query.get("next", ["/"])[-1])
+            return
         if path != "/api/health" and not self._authenticate():
+            self._reject_unauthenticated(path)
             return
         try:
             if path == "/":
@@ -691,13 +979,27 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
                 action_id = path.removeprefix("/api/evidence/")
                 self._send_json(self.application.evidence(action_id))
             else:
-                self.send_error(HTTPStatus.NOT_FOUND)
+                if path.startswith("/api/"):
+                    self._send_json(
+                        {"error": "Route not found."}, HTTPStatus.NOT_FOUND
+                    )
+                else:
+                    self.send_error(HTTPStatus.NOT_FOUND)
         except (GovernanceWorkflowError, ValueError) as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if not self._authenticate() or not self._require_styrai_request_header():
+        if path == "/login":
+            self._handle_login()
+            return
+        if path == "/logout":
+            self._handle_logout()
+            return
+        if not self._authenticate():
+            self._reject_unauthenticated(path)
+            return
+        if not self._require_styrai_request_header():
             return
         try:
             payload = self._bind_authenticated_identity(path, self._read_json())
@@ -839,7 +1141,12 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
                 )
                 self._send_json(self.application.approve(action_id, payload))
             else:
-                self.send_error(HTTPStatus.NOT_FOUND)
+                if path.startswith("/api/"):
+                    self._send_json(
+                        {"error": "Route not found."}, HTTPStatus.NOT_FOUND
+                    )
+                else:
+                    self.send_error(HTTPStatus.NOT_FOUND)
         except (GovernanceWorkflowError, ValueError, json.JSONDecodeError) as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
@@ -881,11 +1188,18 @@ def serve(
     open_browser: bool = False,
 ) -> None:
     auth_users = load_auth_users()
+    session_secret = load_session_secret(required=bool(auth_users))
     application = DemoApplication(audit_path)
     handler = type(
         "ConfiguredStyrAIHandler",
         (StyrAIRequestHandler,),
-        {"application": application, "auth_users": auth_users},
+        {
+            "application": application,
+            "auth_users": auth_users,
+            "session_secret": session_secret,
+            "active_sessions": {},
+            "active_sessions_lock": threading.Lock(),
+        },
     )
     server = ThreadingHTTPServer((host, port), handler)
     health_url, presentation_url = _browser_urls(host, port)
