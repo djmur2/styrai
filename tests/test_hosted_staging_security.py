@@ -64,6 +64,8 @@ class PasswordHashTests(unittest.TestCase):
         now = 1_800_000_000
         secret = b"test-session-secret-with-at-least-32-bytes"
         users = {"founder": "unused-by-session-verification"}
+        with self.assertRaises(ValueError):
+            create_session_token("founder", b"too-short", now=now)
         token = create_session_token("founder", secret, now=now)
         second_token = create_session_token("founder", secret, now=now)
 
