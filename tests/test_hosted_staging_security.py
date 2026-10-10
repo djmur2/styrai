@@ -483,7 +483,7 @@ class HostedHTTPTests(unittest.TestCase):
                 )
             )
 
-        invalid_status, _, invalid_body = self.request(
+        invalid_status, invalid_headers, invalid_body = self.request(
             "/login",
             method="POST",
             cookie=browser_cookies,
@@ -494,21 +494,30 @@ class HostedHTTPTests(unittest.TestCase):
                 "password": self.PASSWORD,
             },
         )
-        self.assertEqual(invalid_status, 403)
-        self.assertIn("form expired", invalid_body)
+        self.assertEqual(invalid_status, 303)
+        self.assertEqual(
+            invalid_headers.get("Location"),
+            "/login?next=%2F&error=expired",
+        )
+        self.assertEqual(invalid_body, "")
 
     def test_login_rejects_bad_credentials_csrf_and_open_redirects(self) -> None:
         status, headers, body, cookie = self.login(
             password="wrong-password",
             next_path="https://attacker.example/collect",
         )
-        self.assertEqual(status, 401)
+        self.assertEqual(status, 303)
         self.assertFalse(cookie)
-        self.assertIn("not recognised", body)
+        self.assertEqual(body, "")
         self.assertNotIn("wrong-password", body)
-        self.assertIsNone(headers.get("Location"))
+        self.assertEqual(
+            headers.get("Location"),
+            "/login?next=%2F&error=credentials",
+        )
+        self.assertNotIn("wrong-password", headers.get("Location"))
+        self.assertNotIn("founder-one", headers.get("Location"))
 
-        status, _, body = self.request(
+        status, headers, body = self.request(
             "/login",
             method="POST",
             form={
@@ -518,8 +527,12 @@ class HostedHTTPTests(unittest.TestCase):
                 "password": self.PASSWORD,
             },
         )
-        self.assertEqual(status, 403)
-        self.assertIn("form expired", body)
+        self.assertEqual(status, 303)
+        self.assertEqual(
+            headers.get("Location"),
+            "/login?next=%2F&error=expired",
+        )
+        self.assertEqual(body, "")
 
         _, login_headers, login_body = self.request("/login")
         csrf_token = re.search(
@@ -544,6 +557,91 @@ class HostedHTTPTests(unittest.TestCase):
         )
         self.assertEqual(status, 303)
         self.assertEqual(headers.get("Location"), "/")
+
+    def test_failed_login_post_redirects_to_fresh_usable_get_form(self) -> None:
+        status, headers, body = self.request(
+            "/login",
+            method="POST",
+            form={
+                "csrf_token": "stale-token",
+                "next": "/?presentation=1",
+                "username": "founder-one",
+                "password": self.PASSWORD,
+            },
+        )
+        self.assertEqual(status, 303)
+        self.assertEqual(body, "")
+        location = headers.get("Location")
+        self.assertEqual(
+            location,
+            "/login?next=%2F%3Fpresentation%3D1&error=expired",
+        )
+        self.assertNotIn(self.PASSWORD, location)
+        self.assertNotIn("founder-one", location)
+
+        get_status, get_headers, get_body = self.request(location)
+        self.assertEqual(get_status, 200)
+        self.assertIn("The sign-in form expired", get_body)
+        csrf_token = re.search(
+            r'name="csrf_token" value="([^"]+)"', str(get_body)
+        ).group(1)
+        csrf_cookie = get_headers.get("Set-Cookie").split(";", 1)[0]
+
+        retry_status, retry_headers, retry_body = self.request(
+            "/login",
+            method="POST",
+            cookie=csrf_cookie,
+            form={
+                "csrf_token": csrf_token,
+                "next": "/?presentation=1",
+                "username": "founder-one",
+                "password": self.PASSWORD,
+            },
+        )
+        self.assertEqual(retry_status, 303)
+        self.assertEqual(retry_headers.get("Location"), "/?presentation=1")
+        self.assertEqual(retry_body, "")
+
+        refresh_status, refresh_headers, refresh_body = self.request(location)
+        self.assertEqual(refresh_status, 200)
+        self.assertIn("The sign-in form expired", refresh_body)
+        refreshed_token = re.search(
+            r'name="csrf_token" value="([^"]+)"', str(refresh_body)
+        ).group(1)
+        self.assertNotEqual(refreshed_token, csrf_token)
+        self.assertIn("Set-Cookie", refresh_headers)
+
+    def test_malformed_login_post_redirects_and_authenticated_stale_tab_recovers(
+        self,
+    ) -> None:
+        malformed_status, malformed_headers, malformed_body = self.request(
+            "/login",
+            method="POST",
+            form={},
+        )
+        self.assertEqual(malformed_status, 303)
+        self.assertEqual(
+            malformed_headers.get("Location"),
+            "/login?next=%2F&error=invalid",
+        )
+        self.assertEqual(malformed_body, "")
+
+        login_status, _, _, session_cookie = self.login()
+        self.assertEqual(login_status, 303)
+        stale_status, stale_headers, stale_body = self.request(
+            "/login",
+            method="POST",
+            cookie=session_cookie,
+            form={
+                "csrf_token": "expired-in-an-old-tab",
+                "next": "/?presentation=1",
+                "username": "founder-one",
+                "password": "no-longer-relevant",
+            },
+        )
+        self.assertEqual(stale_status, 303)
+        self.assertEqual(stale_headers.get("Location"), "/?presentation=1")
+        self.assertEqual(stale_body, "")
 
     def test_tampered_and_expired_session_cookies_are_rejected(self) -> None:
         status, _, _, cookie = self.login()
