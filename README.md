@@ -63,11 +63,14 @@ python3 -m murphyos.auth
 
 The helper reads the password without echo and prints only the encoded hash.
 Store the resulting JSON value in the hosting platform's secret store; never
-commit it or plaintext passwords to this repository. When the variable is set,
-`GET /api/health` remains public for health checks and every other route requires
-HTTP Basic authentication. Expose that mode only behind HTTPS. Browser mutation
-requests also carry a StyrAI-specific request marker, and identity-bearing actor
-and approval fields are attributed to the authenticated username.
+commit it or plaintext passwords to this repository. Also configure a separate
+high-entropy `STYRAI_SESSION_SECRET` of at least 32 bytes. When authentication is
+enabled, `GET /api/health` remains public and browser users sign in through the
+StyrAI form. The application issues a signed Secure, HttpOnly, SameSite=Strict
+session cookie and fails closed if the signing secret is absent. Expose that
+mode only behind HTTPS. Browser mutation requests also carry a StyrAI-specific
+request marker, and identity-bearing actor and approval fields are attributed
+to the authenticated username.
 
 Restarting the application continues the existing audit chain. An explicit demo
 reset rotates a non-empty audit file beside the current file before creating a

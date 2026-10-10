@@ -162,6 +162,12 @@ async function request(url, options = {}) {
     throw new Error("StyrAI could not read the service response. Reload the page or contact the staging owner; the uploaded file has not been evaluated.");
   }
 
+  if (response.status === 401) {
+    const next = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+    throw new Error("Your StyrAI session expired. Sign in again to continue.");
+  }
+
   const contentType = (response.headers.get("content-type") || "").toLowerCase();
   const trimmedResponse = responseText.trim();
   const looksLikeHtml = contentType.includes("text/html") || /^<!doctype\s+html/i.test(trimmedResponse) || /^<html[\s>]/i.test(trimmedResponse);

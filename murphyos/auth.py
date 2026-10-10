@@ -1,4 +1,4 @@
-"""Password hashing and HTTP Basic-auth configuration for StyrAI staging."""
+"""Password hashing and signed-session configuration for StyrAI staging."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import sys
+import time
 from collections.abc import Mapping, Sequence
 
 
@@ -19,6 +20,9 @@ DEFAULT_ITERATIONS = 600_000
 MINIMUM_ITERATIONS = 600_000
 MAXIMUM_ITERATIONS = 5_000_000
 SALT_BYTES = 16
+SESSION_SECRET_ENV = "STYRAI_SESSION_SECRET"
+MINIMUM_SESSION_SECRET_BYTES = 32
+SESSION_TTL_SECONDS = 8 * 60 * 60
 
 
 class AuthenticationConfigurationError(ValueError):
@@ -137,6 +141,130 @@ def load_auth_users(
         _decode_password_hash(raw_hash)
         users[username] = raw_hash
     return users
+
+
+def load_session_secret(
+    raw: str | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    required: bool = False,
+) -> bytes | None:
+    """Load a high-entropy secret used to sign browser session cookies.
+
+    Authentication-enabled deployments fail closed when the secret is absent or
+    too short. Keeping this separate from password hashes allows either value to
+    be rotated without treating the password verifier as a signing key.
+    """
+
+    if raw is None:
+        source = os.environ if environ is None else environ
+        raw = source.get(SESSION_SECRET_ENV)
+    if raw is None:
+        if required:
+            raise AuthenticationConfigurationError(
+                f"{SESSION_SECRET_ENV} is required when authentication is enabled."
+            )
+        return None
+    if raw != raw.strip() or any(character in raw for character in "\r\n\x00"):
+        raise AuthenticationConfigurationError(
+            f"{SESSION_SECRET_ENV} cannot contain padding whitespace or control characters."
+        )
+    encoded = raw.encode("utf-8")
+    if len(encoded) < MINIMUM_SESSION_SECRET_BYTES:
+        raise AuthenticationConfigurationError(
+            f"{SESSION_SECRET_ENV} must contain at least "
+            f"{MINIMUM_SESSION_SECRET_BYTES} bytes."
+        )
+    return encoded
+
+
+def _urlsafe_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _urlsafe_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.b64decode(value + padding, altchars=b"-_", validate=True)
+
+
+def create_session_token(
+    username: str,
+    secret: bytes,
+    *,
+    now: int | None = None,
+    lifetime_seconds: int = SESSION_TTL_SECONDS,
+) -> str:
+    """Create a compact, HMAC-authenticated session token."""
+
+    if not username or not secret:
+        raise ValueError("A username and session secret are required.")
+    if lifetime_seconds <= 0:
+        raise ValueError("Session lifetime must be positive.")
+    issued_at = int(time.time()) if now is None else int(now)
+    claims = json.dumps(
+        {
+            "exp": issued_at + lifetime_seconds,
+            "iat": issued_at,
+            "n": secrets.token_urlsafe(18),
+            "u": username,
+            "v": 1,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    payload = _urlsafe_encode(claims)
+    signature = hmac.new(secret, payload.encode("ascii"), hashlib.sha256).digest()
+    return f"{payload}.{_urlsafe_encode(signature)}"
+
+
+def verify_session_token(
+    token: str,
+    secret: bytes,
+    users: Mapping[str, str],
+    *,
+    now: int | None = None,
+    maximum_lifetime_seconds: int = SESSION_TTL_SECONDS,
+) -> str | None:
+    """Return the authenticated username for a valid, unexpired session token."""
+
+    if not token or len(token) > 2048 or not secret:
+        return None
+    try:
+        payload, separator, raw_signature = token.partition(".")
+        if not separator or "." in raw_signature:
+            return None
+        signature = _urlsafe_decode(raw_signature)
+        expected = hmac.new(
+            secret, payload.encode("ascii"), hashlib.sha256
+        ).digest()
+        if not hmac.compare_digest(signature, expected):
+            return None
+        claims = json.loads(_urlsafe_decode(payload))
+    except (UnicodeEncodeError, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(claims, dict) or claims.get("v") != 1:
+        return None
+    username = claims.get("u")
+    nonce = claims.get("n")
+    issued_at = claims.get("iat")
+    expires_at = claims.get("exp")
+    if (
+        not isinstance(username, str)
+        or username not in users
+        or not isinstance(nonce, str)
+        or len(nonce) < 16
+        or not isinstance(issued_at, int)
+        or isinstance(issued_at, bool)
+        or not isinstance(expires_at, int)
+        or isinstance(expires_at, bool)
+    ):
+        return None
+    current_time = int(time.time()) if now is None else int(now)
+    if issued_at > current_time + 60 or expires_at <= current_time:
+        return None
+    if expires_at <= issued_at or expires_at - issued_at > maximum_lifetime_seconds:
+        return None
+    return username
 
 
 def build_parser() -> argparse.ArgumentParser:
