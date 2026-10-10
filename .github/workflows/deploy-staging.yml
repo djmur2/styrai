@@ -73,6 +73,7 @@ jobs:
           echo "uri=$image_uri" >> "$GITHUB_OUTPUT"
 
       - name: Deploy the image to Lightsail
+        id: deployment
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
           STYRAI_AUTH_USERS_JSON: ${{ secrets.STYRAI_AUTH_USERS_JSON }}
@@ -110,30 +111,49 @@ jobs:
               }
             }' > "$RUNNER_TEMP/styrai-deployment.json"
 
-          aws lightsail create-container-service-deployment \
+          deployment_version=$(aws lightsail create-container-service-deployment \
             --region "$AWS_REGION" \
             --service-name "$LIGHTSAIL_SERVICE" \
             --cli-input-json "file://$RUNNER_TEMP/styrai-deployment.json" \
-            --no-cli-pager
+            --query 'containerService.nextDeployment.version' \
+            --output text \
+            --no-cli-pager)
+
+          case "$deployment_version" in
+            ''|*[!0-9]*)
+              echo "Lightsail did not return the new deployment version." >&2
+              exit 1
+              ;;
+          esac
+          echo "version=$deployment_version" >> "$GITHUB_OUTPUT"
 
       - name: Wait for a healthy deployment
         id: service
+        env:
+          DEPLOYMENT_VERSION: ${{ steps.deployment.outputs.version }}
         run: |
           for attempt in $(seq 1 60); do
-            state=$(aws lightsail get-container-services \
+            deployments=$(aws lightsail get-container-service-deployments \
               --region "$AWS_REGION" \
               --service-name "$LIGHTSAIL_SERVICE" \
-              --query 'containerServices[0].currentDeployment.state' \
-              --output text \
+              --output json \
               --no-cli-pager)
+            state=$(jq -r \
+              --argjson version "$DEPLOYMENT_VERSION" \
+              '.deployments[] | select(.version == $version) | .state' \
+              <<< "$deployments" | head -n 1)
 
             if [ "$state" = "ACTIVE" ]; then
-              url=$(aws lightsail get-container-services \
+              read -r current_version url < <(aws lightsail get-container-services \
                 --region "$AWS_REGION" \
                 --service-name "$LIGHTSAIL_SERVICE" \
-                --query 'containerServices[0].url' \
+                --query 'containerServices[0].[currentDeployment.version,url]' \
                 --output text \
                 --no-cli-pager)
+              if [ "$current_version" != "$DEPLOYMENT_VERSION" ]; then
+                echo "Deployment $DEPLOYMENT_VERSION is active but is not current." >&2
+                exit 1
+              fi
               curl --fail --silent --show-error --retry 8 --retry-all-errors \
                 "$url/api/health" > /dev/null
               echo "url=$url" >> "$GITHUB_OUTPUT"
@@ -141,11 +161,8 @@ jobs:
             fi
 
             if [ "$state" = "FAILED" ]; then
-              echo "Lightsail reported a failed deployment." >&2
-              aws lightsail get-container-service-deployments \
-                --region "$AWS_REGION" \
-                --service-name "$LIGHTSAIL_SERVICE" \
-                --no-cli-pager
+              echo "Lightsail deployment $DEPLOYMENT_VERSION failed." >&2
+              echo "$deployments" >&2
               exit 1
             fi
 
