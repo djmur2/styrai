@@ -423,7 +423,7 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
     web_root = Path(__file__).resolve().parent.parent / "web"
 
     SESSION_COOKIE = "__Host-styrai_session"
-    LOGIN_CSRF_COOKIE = "styrai_login_csrf"
+    LOGIN_CSRF_COOKIE_PREFIX = "styrai_login_csrf_"
     LOGIN_CSRF_MAX_AGE = 10 * 60
     MAX_ACTIVE_SESSIONS = 4096
 
@@ -508,6 +508,12 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
             return ""
         morsel = cookies.get(name)
         return morsel.value if morsel is not None else ""
+
+    @classmethod
+    def _login_csrf_cookie_name(cls, token: str) -> str:
+        """Bind each login form to its own host-only double-submit cookie."""
+        token_fingerprint = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        return f"{cls.LOGIN_CSRF_COOKIE_PREFIX}{token_fingerprint}"
 
     @classmethod
     def _session_cookie(cls, token: str) -> str:
@@ -639,6 +645,7 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
         username: str = "",
         error: str = "",
         status: HTTPStatus = HTTPStatus.OK,
+        consumed_csrf_cookie: str = "",
     ) -> None:
         csrf_token = secrets.token_urlsafe(32)
         safe_next = self._safe_next_path(next_path)
@@ -684,14 +691,23 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
   </body>
 </html>
 """
+        csrf_cookie_name = self._login_csrf_cookie_name(csrf_token)
         csrf_cookie = (
-            f"{self.LOGIN_CSRF_COOKIE}={csrf_token}; Path=/login; "
+            f"{csrf_cookie_name}={csrf_token}; Path=/login; "
             f"Max-Age={self.LOGIN_CSRF_MAX_AGE}; Secure; HttpOnly; SameSite=Strict"
         )
+        response_headers = [("Set-Cookie", csrf_cookie)]
+        if consumed_csrf_cookie:
+            response_headers.append(
+                (
+                    "Set-Cookie",
+                    self._clear_cookie(consumed_csrf_cookie, path="/login"),
+                )
+            )
         self._send_html(
             content,
             status,
-            (("Set-Cookie", csrf_cookie),),
+            response_headers,
         )
 
     def _handle_login(self) -> None:
@@ -705,7 +721,8 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
             return
         next_path = self._safe_next_path(fields.get("next"))
         submitted_csrf = fields.get("csrf_token", "")
-        cookie_csrf = self._cookie_value(self.LOGIN_CSRF_COOKIE)
+        csrf_cookie_name = self._login_csrf_cookie_name(submitted_csrf)
+        cookie_csrf = self._cookie_value(csrf_cookie_name)
         if (
             not submitted_csrf
             or not cookie_csrf
@@ -729,6 +746,7 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
                 username=username,
                 error="The username or password was not recognised.",
                 status=HTTPStatus.UNAUTHORIZED,
+                consumed_csrf_cookie=csrf_cookie_name,
             )
             return
         if self.session_secret is None:
@@ -745,7 +763,7 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
                 ("Set-Cookie", self._session_cookie(token)),
                 (
                     "Set-Cookie",
-                    self._clear_cookie(self.LOGIN_CSRF_COOKIE, path="/login"),
+                    self._clear_cookie(csrf_cookie_name, path="/login"),
                 ),
             ),
         )
