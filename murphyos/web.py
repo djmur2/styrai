@@ -426,6 +426,11 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
     LOGIN_CSRF_COOKIE_PREFIX = "styrai_login_csrf_"
     LOGIN_CSRF_MAX_AGE = 10 * 60
     MAX_ACTIVE_SESSIONS = 4096
+    LOGIN_ERROR_MESSAGES = {
+        "credentials": "The username or password was not recognised.",
+        "expired": "The sign-in form expired. Please try again.",
+        "invalid": "The sign-in form could not be processed. Please try again.",
+    }
 
     SECURITY_HEADERS = {
         "Cache-Control": "no-store",
@@ -549,6 +554,26 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
         next_path = self._safe_next_path(getattr(self, "path", "/"))
         return f"/login?{urlencode({'next': next_path})}"
 
+    def _login_form_url(self, next_path: str = "/", error_code: str = "") -> str:
+        """Build a safe GET URL for a fresh login form after a POST."""
+        query = {"next": self._safe_next_path(next_path)}
+        if error_code in self.LOGIN_ERROR_MESSAGES:
+            query["error"] = error_code
+        return f"/login?{urlencode(query)}"
+
+    def _redirect_to_login_form(
+        self,
+        *,
+        next_path: str = "/",
+        error_code: str = "",
+        extra_headers: Sequence[tuple[str, str]] = (),
+    ) -> None:
+        self._redirect(
+            self._login_form_url(next_path, error_code),
+            status=HTTPStatus.SEE_OTHER,
+            extra_headers=extra_headers,
+        )
+
     @staticmethod
     def _session_fingerprint(token: str) -> str:
         return hashlib.sha256(token.encode("ascii", errors="ignore")).hexdigest()
@@ -645,7 +670,6 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
         username: str = "",
         error: str = "",
         status: HTTPStatus = HTTPStatus.OK,
-        consumed_csrf_cookie: str = "",
     ) -> None:
         csrf_token = secrets.token_urlsafe(32)
         safe_next = self._safe_next_path(next_path)
@@ -696,30 +720,29 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
             f"{csrf_cookie_name}={csrf_token}; Path=/login; "
             f"Max-Age={self.LOGIN_CSRF_MAX_AGE}; Secure; HttpOnly; SameSite=Strict"
         )
-        response_headers = [("Set-Cookie", csrf_cookie)]
-        if consumed_csrf_cookie:
-            response_headers.append(
-                (
-                    "Set-Cookie",
-                    self._clear_cookie(consumed_csrf_cookie, path="/login"),
-                )
-            )
         self._send_html(
             content,
             status,
-            response_headers,
+            (("Set-Cookie", csrf_cookie),),
         )
 
     def _handle_login(self) -> None:
         if not self.auth_users:
             self._redirect("/")
             return
+        already_authenticated = self._authenticate()
         try:
             fields = self._read_form()
-        except ValueError as exc:
-            self._render_login(error=str(exc), status=HTTPStatus.BAD_REQUEST)
+        except ValueError:
+            if already_authenticated:
+                self._redirect("/")
+            else:
+                self._redirect_to_login_form(error_code="invalid")
             return
         next_path = self._safe_next_path(fields.get("next"))
+        if already_authenticated:
+            self._redirect(next_path)
+            return
         submitted_csrf = fields.get("csrf_token", "")
         csrf_cookie_name = self._login_csrf_cookie_name(submitted_csrf)
         cookie_csrf = self._cookie_value(csrf_cookie_name)
@@ -728,11 +751,9 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
             or not cookie_csrf
             or not secrets.compare_digest(submitted_csrf, cookie_csrf)
         ):
-            self._render_login(
+            self._redirect_to_login_form(
                 next_path=next_path,
-                username=fields.get("username", ""),
-                error="The sign-in form expired. Please try again.",
-                status=HTTPStatus.FORBIDDEN,
+                error_code="expired",
             )
             return
         username = fields.get("username", "")
@@ -741,12 +762,15 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
         comparison_hash = stored_hash or next(iter(self.auth_users.values()))
         authenticated = verify_password(password, comparison_hash)
         if stored_hash is None or not authenticated:
-            self._render_login(
+            self._redirect_to_login_form(
                 next_path=next_path,
-                username=username,
-                error="The username or password was not recognised.",
-                status=HTTPStatus.UNAUTHORIZED,
-                consumed_csrf_cookie=csrf_cookie_name,
+                error_code="credentials",
+                extra_headers=(
+                    (
+                        "Set-Cookie",
+                        self._clear_cookie(csrf_cookie_name, path="/login"),
+                    ),
+                ),
             )
             return
         if self.session_secret is None:
@@ -904,7 +928,11 @@ class StyrAIRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             query = parse_qs(urlparse(self.path).query)
-            self._render_login(next_path=query.get("next", ["/"])[-1])
+            error_code = query.get("error", [""])[-1]
+            self._render_login(
+                next_path=query.get("next", ["/"])[-1],
+                error=self.LOGIN_ERROR_MESSAGES.get(error_code, ""),
+            )
             return
         if path != "/api/health" and not self._authenticate():
             self._reject_unauthenticated(path)
