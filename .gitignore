@@ -1,0 +1,27 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Runtime evidence is generated locally and may contain sensitive metadata.
+work/
+*.jsonl
+
+# Local credentials and environment overrides must never be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Office lock files and packaged demo archives.
+~$*
+*.zip
+*.zip.sha256

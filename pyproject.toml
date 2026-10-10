@@ -1,0 +1,8 @@
+[project]
+name = "styrai"
+version = "0.1.0"
+description = "Runtime governance proof of concept for enterprise AI agents"
+requires-python = ">=3.11"
+
+[tool.unittest]
+start-directory = "tests"
