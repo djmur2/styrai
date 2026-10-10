@@ -439,6 +439,64 @@ class HostedHTTPTests(unittest.TestCase):
         self.assertEqual(api_missing["error"], "Route not found.")
         self.assertIn("application/json", api_missing_headers.get("Content-Type"))
 
+    def test_simultaneous_login_forms_keep_independent_csrf_cookies(self) -> None:
+        forms: list[tuple[str, str, str]] = []
+        for tab_number in range(5):
+            status, headers, body = self.request(
+                f"/login?{urlencode({'next': f'/tab-{tab_number}'})}"
+            )
+            self.assertEqual(status, 200)
+            token_match = re.search(
+                r'name="csrf_token" value="([^"]+)"', str(body)
+            )
+            self.assertIsNotNone(token_match)
+            csrf_token = token_match.group(1)
+            csrf_cookie = headers.get("Set-Cookie").split(";", 1)[0]
+            cookie_name = csrf_cookie.split("=", 1)[0]
+            self.assertTrue(
+                cookie_name.startswith(StyrAIRequestHandler.LOGIN_CSRF_COOKIE_PREFIX)
+            )
+            forms.append((csrf_token, csrf_cookie, cookie_name))
+
+        self.assertEqual(len({cookie_name for _, _, cookie_name in forms}), 5)
+        browser_cookies = "; ".join(cookie for _, cookie, _ in forms)
+
+        for form_index in (0, 4):
+            csrf_token, _, cookie_name = forms[form_index]
+            status, headers, _ = self.request(
+                "/login",
+                method="POST",
+                cookie=browser_cookies,
+                form={
+                    "csrf_token": csrf_token,
+                    "next": f"/tab-{form_index}",
+                    "username": "founder-one",
+                    "password": self.PASSWORD,
+                },
+            )
+            self.assertEqual(status, 303)
+            self.assertEqual(headers.get("Location"), f"/tab-{form_index}")
+            self.assertTrue(
+                any(
+                    value.startswith(f"{cookie_name}=") and "Max-Age=0" in value
+                    for value in headers.get_all("Set-Cookie", [])
+                )
+            )
+
+        invalid_status, _, invalid_body = self.request(
+            "/login",
+            method="POST",
+            cookie=browser_cookies,
+            form={
+                "csrf_token": f"{forms[2][0]}-tampered",
+                "next": "/",
+                "username": "founder-one",
+                "password": self.PASSWORD,
+            },
+        )
+        self.assertEqual(invalid_status, 403)
+        self.assertIn("form expired", invalid_body)
+
     def test_login_rejects_bad_credentials_csrf_and_open_redirects(self) -> None:
         status, headers, body, cookie = self.login(
             password="wrong-password",
