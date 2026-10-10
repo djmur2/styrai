@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="StyrAI continuous AI governance operations demonstration"
+    />
+    <title>StyrAI · AI Governance Operations</title>
+    <link rel="stylesheet" href="/styles.css?v=upload-assessment-2" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" data-view="governance" aria-label="StyrAI home">
+          <span class="brand-mark">S</span>
+          <span class="brand-copy">
+            <strong>StyrAI</strong>
+            <small>AI governance operations</small>
+          </span>
+        </a>
+
+        <div class="environment-chip">
+          <span class="live-dot"></span>
+          <span><strong>AI control plane</strong><small>Synthetic enterprise</small></span>
+        </div>
+
+        <nav aria-label="Governance areas">
+          <p class="nav-label">LIVE DEMONSTRATION</p>
+          <button class="nav-item active live-demo-nav" data-view="governance">
+            <span class="nav-icon">◈</span><span>AI control room</span>
+            <span class="nav-indicator"></span>
+          </button>
+          <p class="nav-label">COMMAND CENTRE</p>
+          <button class="nav-item" data-view="dashboard">
+            <span class="nav-icon">⌁</span><span>Portfolio overview</span>
+          </button>
+          <button class="nav-item" data-view="inventory">
+            <span class="nav-icon">▦</span><span>AI systems</span>
+            <span class="nav-count" id="nav-inventory-count">—</span>
+          </button>
+          <button class="nav-item" data-view="monitoring">
+            <span class="nav-icon">⌇</span><span>Model assurance</span>
+          </button>
+          <button class="nav-item" data-view="data-protection">
+            <span class="nav-icon">◈</span><span>AI use gateway</span>
+          </button>
+
+          <p class="nav-label second">ASSURANCE</p>
+          <button class="nav-item" data-view="controls">
+            <span class="nav-icon">✓</span><span>Policies & obligations</span>
+          </button>
+          <button class="nav-item" data-view="automations">
+            <span class="nav-icon">↻</span><span>Automations</span>
+            <span class="nav-indicator"></span>
+          </button>
+          <button class="nav-item" data-view="incidents">
+            <span class="nav-icon">!</span><span>Findings & response</span>
+            <span class="nav-count alert" id="nav-incident-count">—</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-assurance">
+          <div class="assurance-head">
+            <span class="shield">✓</span>
+            <div><strong>Evidence chain</strong><small id="sidebar-audit">Verifying…</small></div>
+          </div>
+          <div class="assurance-line"><span id="sidebar-records">—</span> governance records</div>
+          <p>Simulation only. No real model or customer system is connected.</p>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="page-eyebrow">LIVE GOVERNANCE CONTROL PLANE</p>
+            <h1 id="page-title">AI Control Room</h1>
+            <p class="page-subtitle" id="page-subtitle">
+              Intercept AI use, monitor deployed models and turn obligations into enforceable controls.
+            </p>
+          </div>
+          <div class="top-actions">
+            <div class="last-updated"><span class="live-dot"></span><span>Interactive local simulation<br /><small id="updated-at">Updating…</small></span></div>
+            <button class="button secondary" id="generate-evidence">Generate evidence pack</button>
+            <button class="button reset-demo-button" id="reset-platform" aria-label="Reset demonstration"><span aria-hidden="true">↺</span> Reset demo</button>
+          </div>
+        </header>
+
+        <section class="view active" id="view-governance" data-view-panel="governance">
+          <section class="control-room-intro">
+            <div>
+              <p class="eyebrow">WORKING AI GOVERNANCE DEMONSTRATION</p>
+              <h2>Test real records against regulation and company policy.</h2>
+              <p>Upload a synthetic dataset, inspect exactly what will be evaluated, add a written company policy and run a traceable assessment. StyrAI keeps regulatory results separate from stricter internal requirements.</p>
+            </div>
+            <aside class="control-room-boundary" aria-label="Demonstration boundary">
+              <span>FUNCTIONAL LOCALLY</span>
+              <strong>Policy decisions, enforcement, monitoring, incidents and evidence</strong>
+              <small>Model providers, identities and enterprise connectors are simulated. No real customer data leaves this computer.</small>
+            </aside>
+          </section>
+
+          <section class="assessment-workbench" id="assessment-workbench" aria-labelledby="assessment-workbench-title">
+            <header class="assessment-workbench-heading">
+              <div>
+                <p class="eyebrow">UPLOAD-DRIVEN GOVERNANCE RUN</p>
+                <h3 id="assessment-workbench-title">Evaluate your own synthetic evidence</h3>
+                <p>Nothing is scored until you provide a dataset. Every result shows the records tested, the exact rule applied and the denominator behind each count.</p>
+              </div>
+              <span class="assessment-local-badge"><i></i> Local synthetic-data evaluation</span>
+            </header>
+
+            <div class="assessment-input-grid">
+              <article class="assessment-input-card" aria-labelledby="dataset-upload-title">
+                <header><span class="assessment-step">1</span><div><small>DATASET</small><strong id="dataset-upload-title">Choose the evidence to test</strong></div></header>
+                <div class="assessment-input-body">
+                  <label class="upload-dropzone" id="dataset-dropzone" for="governance-dataset-file">
+                    <span class="upload-symbol" aria-hidden="true">⇧</span>
+                    <strong>Upload synthetic CSV or JSON</strong>
+                    <small>Drop a file here or choose one from this computer · maximum 512,000 characters / 500 rows</small>
+                    <input id="governance-dataset-file" type="file" accept=".csv,.json,text/csv,application/json" />
+                  </label>
+                  <div class="sample-data-actions" role="group" aria-label="Load a sample synthetic dataset">
+                    <span>Or load an executable local sample:</span>
+                    <button class="text-button" type="button" data-sample-dataset="credit-decisions">Credit decisions</button>
+                    <button class="text-button" type="button" data-sample-dataset="clinical-summaries">Clinical summaries</button>
+                  </div>
+                  <div class="dataset-file-summary" id="dataset-file-summary" aria-live="polite">
+                    <span class="empty-file-icon" aria-hidden="true">▦</span><div><strong>No dataset selected</strong><small>Statistics will be calculated from the rows you load—not from pre-populated figures.</small></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="assessment-input-card" aria-labelledby="policy-upload-title">
+                <header><span class="assessment-step">2</span><div><small>INTERNAL POLICY</small><strong id="policy-upload-title">Add the stricter company standard</strong></div></header>
+                <div class="assessment-input-body">
+                  <label class="field-label" for="company-policy-text">Paste written policy</label>
+                  <textarea id="company-policy-text" rows="8" maxlength="20000" placeholder="Example: Any AI-assisted credit recommendation with confidence below 90% must receive manual review before action."></textarea>
+                  <div class="policy-input-actions">
+                    <label class="button secondary compact-file-button" for="company-policy-file">Upload .txt or .md</label>
+                    <input id="company-policy-file" class="visually-hidden" type="file" accept=".txt,.md,text/plain,text/markdown" />
+                    <button class="text-button" type="button" id="load-sample-policy">Use stricter sample policy</button>
+                  </div>
+                  <div class="policy-source-status" id="policy-source-status" aria-live="polite"><strong>No internal policy added</strong><small>The regulatory baseline can still run by itself.</small></div>
+                  <p class="policy-compiler-note"><strong>Policy compiler guardrail:</strong> this prototype uses deterministic clause extraction—not an external LLM—and asks you to approve extracted rules before activation. A production LLM could propose mappings, but should not silently create enforceable policy.</p>
+                </div>
+              </article>
+
+              <article class="assessment-input-card reference-card" aria-labelledby="reference-library-title">
+                <header><span class="assessment-step">3</span><div><small>CROSS-REFERENCE</small><strong id="reference-library-title">Review the reference library</strong></div></header>
+                <div class="assessment-input-body">
+                  <div class="reference-library-list" id="regulation-library-summary">
+                    <div><span class="reference-kind regulation">REGULATION</span><strong>EU AI Act · Article 14</strong><small>Human oversight · source version and applicability shown below</small></div>
+                    <div><span class="reference-kind regulation">REGULATION</span><strong>GDPR · Article 22</strong><small>Automated individual decision-making applicability screen</small></div>
+                    <div><span class="reference-kind policy">COMPANY</span><strong id="active-policy-reference">No policy loaded</strong><small id="active-policy-detail">Upload or paste a policy to add stricter clauses to this run.</small></div>
+                  </div>
+                  <p class="legal-boundary-note"><strong>Cross-reference, not legal advice.</strong> A result identifies potential control gaps for review; it does not determine legal compliance or liability.</p>
+                </div>
+              </article>
+            </div>
+
+            <section class="regulation-library-panel" aria-labelledby="regulation-library-title-main">
+              <div class="regulation-library-heading"><div><p class="eyebrow">REGULATION LIBRARY</p><h4 id="regulation-library-title-main">The provisions StyrAI can cite</h4><p>Every reference includes its source version, applicability date and the operational controls it informs.</p></div><span id="regulation-library-count">Loading references…</span></div>
+              <div class="regulation-library-grid" id="regulation-library-grid"><div class="regulation-library-loading">Loading exact provisions from the local governance library…</div></div>
+            </section>
+
+            <section class="dataset-inspection" id="dataset-inspection" aria-labelledby="dataset-inspection-title" hidden>
+              <div class="dataset-inspection-heading">
+                <div><p class="eyebrow">BEFORE THE RUN</p><h4 id="dataset-inspection-title">Detected schema and record preview</h4></div>
+                <span id="dataset-inspection-count">0 records</span>
+              </div>
+              <div class="schema-chip-list" id="dataset-schema" aria-label="Detected fields"></div>
+              <div class="dataset-preview-wrap"><table class="dataset-preview-table"><thead id="dataset-preview-head"></thead><tbody id="dataset-preview-body"></tbody></table></div>
+              <p class="preview-limit-note" id="dataset-preview-note"></p>
+            </section>
+
+            <div class="assessment-run-bar">
+              <div>
+                <strong id="assessment-run-readiness">Add a dataset to begin</strong>
+                <span id="assessment-run-readiness-detail">The run button activates after StyrAI can parse at least one record.</span>
+              </div>
+              <div class="assessment-run-actions">
+                <button class="button secondary" type="button" id="reset-dataset-run">Clear run</button>
+                <button class="button primary" type="button" id="run-dataset-assessment" disabled>Run governance assessment</button>
+              </div>
+            </div>
+
+            <section class="assessment-results" id="assessment-results" aria-labelledby="assessment-results-title" hidden>
+              <header class="assessment-results-heading">
+                <div><p class="eyebrow">PERSISTENT RUN RESULT</p><h3 id="assessment-results-title">Regulatory and internal policy results</h3><p id="assessment-results-subtitle">Results remain visible until you clear or replace the run.</p></div>
+                <span class="status-pill review" id="assessment-overall-status">Review required</span>
+              </header>
+              <div class="assessment-boundary-banner"><strong id="assessment-divergence-title">Two separate decisions</strong><span id="assessment-divergence-detail">A regulatory screen can pass while a stricter company policy still requires manual review. “Pass” means no issue was detected by the rules tested—not a legal opinion.</span></div>
+              <div class="assessment-stat-grid" id="assessment-stat-grid"></div>
+              <p class="assessment-stat-definition" id="assessment-stat-definition"></p>
+              <div class="assessment-layer-grid" id="assessment-layer-grid"></div>
+              <section class="assessment-model-statistics" aria-labelledby="assessment-model-statistics-title">
+                <div class="assessment-model-statistics-heading"><div><h4 id="assessment-model-statistics-title">Statistics calculated from this upload</h4><p>Descriptive measures show their input denominator and definition. They are never presented as compliance scores.</p></div></div>
+                <div class="model-statistics-grid" id="model-statistics-grid"></div>
+              </section>
+              <section class="assessment-findings-panel" aria-labelledby="assessment-findings-title">
+                <div class="assessment-findings-heading"><div><h4 id="assessment-findings-title">Row-level findings and exact references</h4><p>Each finding points back to a record, a rule source and the evidence that triggered it.</p></div><span id="assessment-findings-count">0 findings</span></div>
+                <div class="assessment-findings-table-wrap"><table class="assessment-findings-table"><thead><tr><th>Record</th><th>Layer</th><th>Result</th><th>Exact reference</th><th>Evidence observed</th><th>Required action</th></tr></thead><tbody id="assessment-findings-body"></tbody></table></div>
+              </section>
+              <footer class="assessment-run-provenance" id="assessment-run-provenance"></footer>
+            </section>
+          </section>
+
+          <section class="governance-scenario-shell secondary-control-tests" aria-labelledby="governance-scenario-title">
+            <div class="governance-scenario-heading">
+              <div>
+                <p class="eyebrow">QUICK CONTROL TESTS</p>
+                <h3 id="governance-scenario-title">Explore the existing runtime scenarios</h3>
+              </div>
+              <span class="local-runtime-chip"><i></i> Local enforcement engine ready</span>
+            </div>
+
+            <div class="governance-scenario-picker" role="group" aria-label="AI governance demonstrations">
+              <button class="governance-scenario-button active" type="button" data-governance-scenario="data-leak" aria-pressed="true">
+                <span class="scenario-number">01</span>
+                <span><strong>Stop a data leak</strong><small>Corporate user → public AI</small></span>
+                <em>Runtime DLP</em>
+              </button>
+              <button class="governance-scenario-button" type="button" data-governance-scenario="model-drift" aria-pressed="false">
+                <span class="scenario-number">02</span>
+                <span><strong>Contain model drift</strong><small>Finance model in production</small></span>
+                <em>Continuous monitoring</em>
+              </button>
+              <button class="governance-scenario-button" type="button" data-governance-scenario="regulatory-gap" aria-pressed="false">
+                <span class="scenario-number">03</span>
+                <span><strong>Flag control gaps</strong><small>Healthcare AI assessment</small></span>
+                <em>Policy + regulation</em>
+              </button>
+            </div>
+
+            <div class="governance-live-grid">
+              <article class="governance-stage-card input-stage">
+                <header><span>1</span><div><small>SYNTHETIC EVENT</small><strong>What StyrAI observes</strong></div></header>
+                <div id="governance-input"></div>
+              </article>
+              <article class="governance-stage-card control-stage">
+                <header><span>2</span><div><small>CONTROL EVALUATION</small><strong>What StyrAI checks</strong></div></header>
+                <div id="governance-control-trace"></div>
+              </article>
+              <article class="governance-stage-card outcome-stage">
+                <header><span>3</span><div><small>ENFORCEMENT OUTCOME</small><strong>What StyrAI does</strong></div></header>
+                <div id="governance-outcome" aria-live="polite"></div>
+              </article>
+            </div>
+
+            <div class="governance-action-bar">
+              <div id="governance-scenario-summary"></div>
+              <div class="governance-actions">
+                <button class="button secondary" type="button" id="reset-governance-demo">Reset</button>
+                <button class="button primary" type="button" id="run-governance-scenario">Run control test</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="control-plane-facts" aria-label="Current AI governance estate">
+            <article><span>AI SYSTEMS DISCOVERED</span><strong id="governance-system-count">—</strong><small>Models, agents and shadow AI</small></article>
+            <article><span>PRODUCTION MONITORING</span><strong id="governance-monitoring-coverage">—</strong><small>Monitored systems / deployed systems</small></article>
+            <article><span>SENSITIVE CALLS STOPPED</span><strong id="governance-blocked-count">—</strong><small>Before provider transmission</small></article>
+            <article><span>RAW PROMPTS RETAINED</span><strong>0</strong><small>Metadata and hashes only</small></article>
+          </section>
+
+          <section class="governance-follow-through">
+            <article class="panel governance-evidence-panel">
+              <div class="panel-heading"><div><p class="eyebrow">CORRELATED EVIDENCE</p><h3>Latest control result</h3></div><span class="panel-badge" id="governance-evidence-status">Ready</span></div>
+              <div id="governance-evidence"><div class="governance-empty-state"><strong>No test has run yet</strong><p>Choose a scenario and run it to create a policy decision, incident response and reconstructable evidence.</p></div></div>
+            </article>
+            <article class="panel governance-estate-panel">
+              <div class="panel-heading"><div><p class="eyebrow">DEPLOYED AI ESTATE</p><h3>Systems requiring attention</h3></div><button class="text-button" data-go-view="inventory">Open inventory</button></div>
+              <div id="governance-estate"></div>
+            </article>
+          </section>
+        </section>
+
+        <section class="view" id="view-execution" data-view-panel="execution">
+          <section class="pipeline-hero">
+            <div>
+              <p class="eyebrow">EXECUTABLE GOVERNANCE DEMONSTRATIONS</p>
+              <h2>Run the complete AI control loop.</h2>
+              <p>Choose a fictional finance or healthcare workflow, execute each governed stage, make the human decision, invoke the safe local action adapter and prove the outcome.</p>
+            </div>
+            <div class="pipeline-hero-proof">
+              <span class="live-dot"></span>
+              <div><strong>Local control logic active</strong><small>Interactive local simulation with deterministic model and downstream-system fixtures.</small></div>
+            </div>
+          </section>
+
+          <section class="presenter-console panel" id="presenter-panel" aria-labelledby="presenter-title">
+            <div class="presenter-console-copy">
+              <p class="eyebrow">PRESENTER MODE</p>
+              <h3 id="presenter-title">Choose the story you want to demonstrate</h3>
+              <p>Each guided scenario loads fictional source data, applies the same local governance controls and leaves a reviewable execution trail.</p>
+              <div class="presenter-scenarios" role="group" aria-label="Guided demonstration scenarios">
+                <button class="presenter-scenario-button finance" type="button" data-presenter-scenario="finance-success" aria-controls="synthetic-record-content pipeline-workspace">
+                  <span class="presenter-scenario-icon" aria-hidden="true">✓</span>
+                  <span><strong>Finance · approved</strong><small>Payment batch completes with dual approval</small></span>
+                </button>
+                <button class="presenter-scenario-button blocked" type="button" data-presenter-scenario="finance-blocked" aria-controls="synthetic-record-content pipeline-workspace">
+                  <span class="presenter-scenario-icon" aria-hidden="true">!</span>
+                  <span><strong>Finance · blocked</strong><small>Control catches a material mismatch</small></span>
+                </button>
+                <button class="presenter-scenario-button healthcare" type="button" data-presenter-scenario="healthcare-success" aria-controls="synthetic-record-content pipeline-workspace">
+                  <span class="presenter-scenario-icon" aria-hidden="true">+</span>
+                  <span><strong>Healthcare · approved</strong><small>Clinical summary is validated before write-back</small></span>
+                </button>
+              </div>
+            </div>
+            <aside class="presenter-guide" id="presenter-guide" aria-live="polite">
+              <span class="presenter-guide-step">01</span>
+              <div>
+                <strong>Start with a guided scenario</strong>
+                <p>Select a story, show the synthetic source record, then walk the audience through control, approval, action and evidence.</p>
+              </div>
+            </aside>
+          </section>
+
+          <section class="truth-boundary" aria-label="Demonstration truth boundary">
+            <article class="truth-column is-live">
+              <span class="truth-status"><i></i> LIVE LOCAL CONTROL LOGIC</span>
+              <strong>What the prototype actually executes</strong>
+              <p>Policy, state, validation, approvals, action gate, reconciliation and evidence.</p>
+            </article>
+            <article class="truth-column is-simulated">
+              <span class="truth-status"><i></i> SIMULATED DEPENDENCIES</span>
+              <strong>Deterministic demonstration fixtures</strong>
+              <p>AI inference, treasury and EHR connectors, user identities and telemetry.</p>
+            </article>
+            <article class="truth-column is-not-claimed">
+              <span class="truth-status"><i></i> NOT CLAIMED</span>
+              <strong>Not represented by this prototype</strong>
+              <p>Production security or tenancy, real integrations, regulatory approval or certification.</p>
+            </article>
+          </section>
+
+          <section class="pipeline-catalog" id="pipeline-catalog" aria-label="Executable pipeline catalogue"></section>
+          <p class="pipeline-safety-note">Fictional local fixtures only. This demonstration performs no real payment, clinical advice, diagnosis, prescribing, sanctions, fraud or credit check, and no connected EHR or financial-system action.</p>
+
+          <section class="synthetic-data-panel panel" aria-labelledby="synthetic-data-title">
+            <div class="synthetic-data-heading">
+              <div>
+                <p class="eyebrow">SYNTHETIC SOURCE DATA</p>
+                <h3 id="synthetic-data-title">The record being governed</h3>
+                <p>Fictional demonstration data appears here before a run so the audience can compare the source, proposed AI output and reconciled result.</p>
+              </div>
+              <span class="synthetic-record-status" id="synthetic-record-status">Choose a presenter scenario</span>
+            </div>
+            <div class="synthetic-record-shell" id="synthetic-record-content" aria-live="polite">
+              <div class="synthetic-record-empty">
+                <span aria-hidden="true">▦</span>
+                <div><strong>No synthetic record selected</strong><p>Use one of the three presenter scenarios above or choose a workflow from the catalogue.</p></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pipeline-workspace" id="pipeline-workspace">
+            <article class="pipeline-config panel">
+              <div class="pipeline-config-heading">
+                <div><p class="eyebrow">PIPELINE CONTROLS</p><h3 id="pipeline-config-title">Choose a demonstration</h3></div>
+                <span class="status-pill authorized">Local fixtures only</span>
+              </div>
+              <div class="pipeline-config-grid">
+                <label>Industry pipeline<select id="pipeline-select" aria-label="Industry pipeline"></select></label>
+                <label>Fictional case<select id="pipeline-case-select" aria-label="Fictional case"></select></label>
+                <label>Run mode<select id="pipeline-mode-select" aria-label="Run mode"><option value="controlled">Controlled path</option><option value="negative">Negative control test</option></select></label>
+                <button class="button primary pipeline-start" id="pipeline-start">Start governed run</button>
+              </div>
+              <p class="pipeline-config-help" id="pipeline-config-help">Select a pipeline and case. Nothing leaves this computer.</p>
+            </article>
+
+            <section class="passport-strip pipeline-passport" id="pipeline-passport" aria-label="Selected governance passport"></section>
+            <ol class="journey-ribbon pipeline-stages" id="pipeline-stages" aria-label="Pipeline stages"></ol>
+
+            <section class="execution-canvas pipeline-canvas">
+              <article class="workbench-window" id="pipeline-source"></article>
+              <aside class="governance-overlay" id="pipeline-overlay" aria-live="polite"></aside>
+            </section>
+
+            <article class="pipeline-action-dock panel" id="pipeline-action-dock" aria-live="polite"></article>
+
+            <article class="execution-route-panel panel">
+              <div class="panel-heading"><div><p class="eyebrow">CORRELATED PROOF</p><h3>One run across source, model, approval and action</h3></div><span class="panel-badge" id="pipeline-correlation">Not started</span></div>
+              <div class="pipeline-proof-grid" id="pipeline-proof"></div>
+            </article>
+          </section>
+
+          <article class="panel pipeline-history-panel">
+            <div class="panel-heading"><div><p class="eyebrow">EXECUTION HISTORY</p><h3>Recent finance and healthcare runs</h3></div><span class="panel-badge">Shared control plane</span></div>
+            <div class="pipeline-run-history" id="pipeline-run-history"></div>
+          </article>
+
+          <section class="demo-handoff-grid pipeline-handoff-grid">
+            <article class="panel handoff-card"><span class="handoff-icon blue">⌁</span><div><p class="eyebrow">PLATFORM IMPACT</p><h3>Inspect the resulting governance state</h3><p>Runtime traffic, incidents, automations, monitoring and audit evidence update from each run.</p></div><button class="button secondary" data-go-view="dashboard">Open command centre</button></article>
+            <article class="panel handoff-card"><span class="handoff-icon violet">✓</span><div><p class="eyebrow">RUN EVIDENCE</p><h3>Export the selected execution trail</h3><p>Download the source-to-action record with validation, approval, receipts and linked incidents.</p></div><button class="button secondary" id="download-execution-evidence" disabled>Download selected evidence</button></article>
+          </section>
+        </section>
+
+        <section class="view" id="view-dashboard" data-view-panel="dashboard">
+          <article class="hero">
+            <div class="hero-copy">
+              <p class="hero-kicker">GOVERN THE WHOLE AI LIFECYCLE</p>
+              <h2>See every system. Control every use. Prove every decision.</h2>
+              <p>
+                StyrAI continuously inventories AI, inspects model traffic, monitors
+                production health and turns policy breaches into automated, reviewable action.
+              </p>
+              <div class="hero-actions">
+                <button class="button light" data-go-view="data-protection">Test confidential-data controls</button>
+                <button class="button transparent" data-go-view="automations">View governance automations</button>
+              </div>
+            </div>
+            <div class="hero-status">
+              <div class="status-orbit">
+                <div class="orbit-ring ring-one"></div>
+                <div class="orbit-ring ring-two"></div>
+                <div class="orbit-core"><strong id="hero-coverage">—</strong><small>effective<br />controls</small></div>
+                <span class="orbit-node node-one"></span>
+                <span class="orbit-node node-two"></span>
+                <span class="orbit-node node-three"></span>
+              </div>
+              <div class="hero-proof"><span class="proof-check">✓</span><div><small>Audit integrity</small><strong id="hero-integrity">Checking</strong></div></div>
+            </div>
+          </article>
+
+          <section class="metrics-grid" aria-label="AI governance metrics">
+            <article class="metric-card"><div class="metric-label"><span>AI systems</span><i class="metric-icon blue">▦</i></div><strong id="metric-systems">—</strong><small><b id="metric-production">—</b> operating in production</small></article>
+            <article class="metric-card"><div class="metric-label"><span>Production monitoring</span><i class="metric-icon green">⌇</i></div><strong id="metric-monitoring">—</strong><small>Monitored systems / production systems</small></article>
+            <article class="metric-card"><div class="metric-label"><span>Model calls · 24h</span><i class="metric-icon violet">↗</i></div><strong id="metric-calls">—</strong><small id="metric-spend">— spend through governed routes</small></article>
+            <article class="metric-card warning"><div class="metric-label"><span>Sensitive calls blocked</span><i class="metric-icon amber">◈</i></div><strong id="metric-blocked">—</strong><small>Prevented before transmission</small></article>
+            <article class="metric-card incident"><div class="metric-label"><span>Open incidents</span><i class="metric-icon red">!</i></div><strong id="metric-incidents">—</strong><small>Automated containment active</small></article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel estate-panel span-two">
+              <div class="panel-heading">
+                <div><p class="eyebrow">AI ESTATE</p><h3>Production systems under governance</h3></div>
+                <button class="text-button" data-go-view="inventory">View full inventory →</button>
+              </div>
+              <div class="table-wrap"><table><thead><tr><th>System</th><th>Owner</th><th>Risk</th><th>Model version</th><th>Health</th><th>Calls · 24h</th></tr></thead><tbody id="dashboard-assets"></tbody></table></div>
+            </article>
+
+            <article class="panel coverage-panel">
+              <div class="panel-heading"><div><p class="eyebrow">ASSURANCE</p><h3>Control operating status</h3></div><span class="panel-badge">Explicit counts</span></div>
+              <div class="coverage-body">
+                <div class="coverage-ring" id="coverage-ring"><div><strong id="coverage-value">—</strong><small>effective /<br />total</small></div></div>
+                <div class="coverage-legend" id="coverage-legend"></div>
+              </div>
+              <button class="wide-link" data-go-view="controls">Inspect controls and evidence <span>→</span></button>
+            </article>
+
+            <article class="panel runtime-panel span-two">
+              <div class="panel-heading"><div><p class="eyebrow">RUNTIME ACTIVITY</p><h3>Latest governed model calls</h3></div><span class="live-label"><i></i> Local policy decisions</span></div>
+              <div class="runtime-list" id="dashboard-events"></div>
+            </article>
+
+            <article class="panel incident-panel">
+              <div class="panel-heading"><div><p class="eyebrow">ACTION REQUIRED</p><h3>Open incidents</h3></div><button class="text-button" data-go-view="incidents">See all →</button></div>
+              <div id="dashboard-incidents" class="mini-incident-list"></div>
+            </article>
+
+            <article class="panel automation-summary span-three">
+              <div class="automation-summary-copy"><span class="automation-emblem">↻</span><div><p class="eyebrow">AUTOMATED GOVERNANCE</p><h3>Controls that act—not just dashboards that observe</h3><p>Discovery, data inspection, version gating, drift response and evidence generation run continuously.</p></div></div>
+              <div class="automation-stats"><div><strong id="automation-count">—</strong><small>active workflows</small></div><div><strong id="automation-runs">—</strong><small>total runs</small></div><button class="button dark" data-go-view="automations">Open automation centre</button></div>
+            </article>
+          </section>
+        </section>
+
+        <section class="view" id="view-inventory" data-view-panel="inventory">
+          <section class="section-banner">
+            <div><p class="eyebrow">SINGLE SOURCE OF TRUTH</p><h2>AI system inventory</h2><p>Models, agents, providers, owners, intended uses, risk tiers and deployment boundaries in one governed registry.</p></div>
+            <div class="banner-stat"><strong id="inventory-total">—</strong><small>registered and discovered systems</small></div>
+          </section>
+          <article class="panel filter-bar"><div class="search-box">⌕ <input id="inventory-search" placeholder="Search systems, owners or providers" /></div><div class="filter-pills"><button class="filter-pill active" data-inventory-filter="all">All</button><button class="filter-pill" data-inventory-filter="production">Production</button><button class="filter-pill" data-inventory-filter="high">High risk</button><button class="filter-pill" data-inventory-filter="attention">Needs attention</button></div></article>
+          <article class="panel inventory-table-panel"><div class="table-wrap"><table class="large-table"><thead><tr><th>AI system</th><th>Business owner</th><th>Provider & region</th><th>Approved use</th><th>Risk</th><th>Status</th><th>Next review</th></tr></thead><tbody id="inventory-table"></tbody></table></div></article>
+        </section>
+
+        <section class="view" id="view-monitoring" data-view-panel="monitoring">
+          <section class="section-banner monitoring-banner">
+            <div><p class="eyebrow">PRODUCTION ASSURANCE</p><h2>Model monitoring</h2><p>Quality, groundedness, drift, errors, latency, usage and cost—linked back to model ownership and approved purpose.</p></div>
+            <div class="banner-stat"><strong id="healthy-models">—</strong><small>systems within operating thresholds</small></div>
+          </section>
+          <div class="model-grid" id="model-grid"></div>
+          <article class="panel threshold-panel"><div class="panel-heading"><div><p class="eyebrow">AUTOMATED RESPONSE</p><h3>Threshold policy</h3></div><span class="panel-badge green">Enforced</span></div><div class="threshold-grid"><div><span>Groundedness</span><strong>≥ 0.80</strong><small>Below threshold → fallback + validation</small></div><div><span>Population drift</span><strong>≤ 0.15</strong><small>Above threshold → containment</small></div><div><span>Error rate</span><strong>≤ 3%</strong><small>Above threshold → owner escalation</small></div><div><span>P95 latency</span><strong>≤ 2,000 ms</strong><small>Above threshold → route review</small></div></div></article>
+        </section>
+
+        <section class="view" id="view-data-protection" data-view-panel="data-protection">
+          <section class="section-banner data-banner">
+            <div><p class="eyebrow">DATA BEFORE DESTINATION</p><h2>Confidential-data control</h2><p>Inspect and control information before it reaches a model provider. This demonstration stores no raw input.</p></div>
+            <div class="banner-stat"><strong>0</strong><small>raw prompts retained by StyrAI</small></div>
+          </section>
+          <section class="protection-grid">
+            <article class="panel simulator-panel">
+              <div class="panel-heading"><div><p class="eyebrow">POLICY SIMULATOR</p><h3>Test an outbound model call</h3></div><span class="simulation-label">Local simulation</span></div>
+              <p class="panel-copy">Use fictional demonstration data only. StyrAI detects sensitive patterns, reconciles the model passport and applies the destination policy.</p>
+              <form id="call-simulator">
+                <label>AI system<select id="sim-asset" required></select></label>
+                <div class="form-row"><label>Declared classification<select id="sim-classification"><option value="public">Public</option><option value="internal" selected>Internal</option><option value="confidential">Confidential</option><option value="restricted">Restricted</option></select></label><label>Acting user<input id="sim-actor" value="advisor-demo" /></label></div>
+                <label>Model input<textarea id="sim-prompt" rows="6" placeholder="Enter fictional demonstration content…"></textarea></label>
+                <div class="scenario-buttons"><button type="button" data-prompt-scenario="safe">Safe internal question</button><button type="button" data-prompt-scenario="confidential">Customer information</button><button type="button" data-prompt-scenario="secret">Credential exposure</button></div>
+                <button class="button primary submit-call" type="submit">Evaluate before transmission</button>
+              </form>
+            </article>
+            <article class="panel decision-panel">
+              <div class="panel-heading"><div><p class="eyebrow">DECISION EXPLAINER</p><h3>Runtime result</h3></div><span class="step-badge">Policy → action</span></div>
+              <div class="empty-decision" id="empty-decision"><div class="empty-shield">◈</div><strong>Ready to inspect a model call</strong><p>The decision will show the data classification, destination trust, model passport, applied controls and automated response.</p></div>
+              <div class="decision-result hidden" id="decision-result"></div>
+            </article>
+          </section>
+          <section class="data-policy-grid">
+            <article class="panel policy-card"><span class="policy-symbol red">×</span><div><strong>Restricted → external model</strong><p>Blocked before the trust boundary. Incident and evidence created automatically.</p></div><span class="status-pill blocked">Block</span></article>
+            <article class="panel policy-card"><span class="policy-symbol amber">⌁</span><div><strong>Confidential → approved gateway</strong><p>Sensitive fields removed; only approved zero-retention routes permitted.</p></div><span class="status-pill review">Redact</span></article>
+            <article class="panel policy-card"><span class="policy-symbol blue">✓</span><div><strong>Public/internal → approved purpose</strong><p>Allowed when model version, tool, region and use match the passport.</p></div><span class="status-pill authorized">Allow</span></article>
+            <article class="panel policy-card"><span class="policy-symbol violet">!</span><div><strong>Secrets and credentials</strong><p>Always blocked. Raw input is not written to governance evidence.</p></div><span class="status-pill blocked">Block</span></article>
+          </section>
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">RECENT DATA DECISIONS</p><h3>Outbound AI traffic</h3></div></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>System</th><th>Data class</th><th>Detected</th><th>Destination</th><th>Decision</th><th>Evidence</th></tr></thead><tbody id="data-events"></tbody></table></div></article>
+        </section>
+
+        <section class="view" id="view-controls" data-view-panel="controls">
+          <section class="section-banner controls-banner"><div><p class="eyebrow">POLICY TO PROOF</p><h2>Controls and evidence</h2><p>Technical controls mapped to multiple frameworks, with owners, discrete operating status and test evidence.</p></div><div class="banner-stat"><strong id="control-total">—</strong><small>operational control objectives</small></div></section>
+          <div class="framework-grid" id="framework-grid"></div>
+          <article class="panel controls-table-panel"><div class="panel-heading"><div><p class="eyebrow">CONTROL LIBRARY</p><h3>Operating effectiveness</h3></div><span class="panel-badge">Technical mappings—not certification</span></div><div class="table-wrap"><table class="large-table"><thead><tr><th>Control</th><th>Domain</th><th>Type</th><th>Automation</th><th>Status</th><th>Evidence records</th><th>Last tested</th><th>Owner</th></tr></thead><tbody id="control-table"></tbody></table></div></article>
+        </section>
+
+        <section class="view" id="view-automations" data-view-panel="automations">
+          <section class="section-banner automation-banner"><div><p class="eyebrow">GOVERNANCE THAT RUNS</p><h2>Automation centre</h2><p>Continuous discovery, interception, monitoring, escalation and evidence workflows—with human ownership where judgement is required.</p></div><div class="banner-stat"><strong id="automation-total">—</strong><small>enabled governance workflows</small></div></section>
+          <div class="automation-grid" id="automation-grid"></div>
+          <article class="panel run-history"><div class="panel-heading"><div><p class="eyebrow">EXECUTION HISTORY</p><h3>Recent automation runs</h3></div></div><div id="automation-history" class="run-list"></div></article>
+        </section>
+
+        <section class="view" id="view-incidents" data-view-panel="incidents">
+          <section class="section-banner incident-banner"><div><p class="eyebrow">FROM DETECTION TO CONTAINMENT</p><h2>Incidents and evidence packs</h2><p>Policy breaches, model changes and health thresholds become owned incidents with automatic containment and reconstructable evidence.</p></div><div class="banner-stat"><strong id="incident-open-total">—</strong><small>open governance incidents</small></div></section>
+          <article class="panel incidents-panel"><div class="panel-heading"><div><p class="eyebrow">INCIDENT QUEUE</p><h3>AI governance incidents</h3></div><span class="panel-badge red">Prioritised by severity</span></div><div id="incident-list" class="incident-list"></div></article>
+          <article class="panel packs-panel"><div class="panel-heading"><div><p class="eyebrow">ASSURANCE OUTPUT</p><h3>Evidence packs</h3></div><button class="button secondary" id="generate-evidence-secondary">Generate now</button></div><div id="pack-list" class="pack-list"></div></article>
+        </section>
+
+        <footer>
+          <div><strong>StyrAI</strong><span>Continuous AI governance operations prototype</span></div>
+          <span>Demonstration controls and evidence—not legal advice or compliance certification.</span>
+        </footer>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js?v=upload-assessment-2" defer></script>
+  </body>
+</html>

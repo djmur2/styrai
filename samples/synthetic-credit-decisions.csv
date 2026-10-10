@@ -1,0 +1,7 @@
+record_id,domain,risk_class,ai_act_role,decision_mode,confidence,instructions_for_use_followed,human_oversight_available,oversight_person_competent,contains_personal_data,processing_purpose_documented,data_necessary,data_minimized,significant_effect,human_intervention_available,contestability_available,art22_exception_documented,manual_review_completed,outcome_label
+FIN-1001,financial_services,high_impact,deployer,ai_assisted,0.91,true,true,true,true,true,true,true,true,true,true,true,false,approved
+FIN-1002,financial_services,high_impact,deployer,ai_assisted,0.74,true,true,true,true,true,true,true,true,true,true,true,false,approved
+FIN-1003,financial_services,high_impact,deployer,solely_automated,0.93,true,true,true,true,true,true,true,true,true,true,true,false,declined
+FIN-1004,financial_services,high_impact,deployer,solely_automated,0.66,true,true,true,true,true,true,true,true,true,true,true,false,declined
+FIN-1005,financial_services,high_impact,deployer,ai_assisted,0.84,true,true,true,true,true,true,false,true,true,true,true,true,declined
+FIN-1006,financial_services,limited,deployer,ai_assisted,0.77,true,true,true,true,true,true,true,false,true,true,true,false,approved
